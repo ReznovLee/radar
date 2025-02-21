@@ -1,0 +1,5 @@
+numpy~=2.0.2
+scipy
+matplotlib
+pyyaml~=6.0.2
+pandas~=2.2.3

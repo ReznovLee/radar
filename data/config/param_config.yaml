@@ -1,0 +1,38 @@
+# 场景配置文件
+
+# 雷达数量
+num_radars: 5
+
+# 目标数量
+num_targets: 10
+
+# 雷达聚集率
+radar_aggregation_rate: 0.6
+
+# 目标聚集率
+target_aggregation_rate: 0.6
+
+# 雷达网络中心坐标
+radar_network_center: (500, 500, 0)
+
+# 目标落点中心坐标
+center_drop_position: (500, 500, 0)
+
+# 目标类型比例（百分比，总和应为1.0）
+target_ratio:
+  ballistic_missile: 0.1  # 10% 弹道导弹
+  cruise_missile: 0.4     # 40% 巡航导弹
+  fighter_jet: 0.4        # 40% 战斗机
+
+# 仿真时间参数
+simulation:
+  total_time: 100   # 总仿真时间（秒）
+  time_step: 1    # 每个时间步长（秒）
+  algorithm_step: 10.0  # 每次态势融合时间（秒）
+
+# 输出文件夹和文件命名
+output:
+  base_folder: "scenario"  # 输出文件夹基础名称
+  radar_filename_template: "{num_radars}-radar.csv"  # 雷达 CSV 文件名
+  target_filename_template: "{num_targets}-targets.csv"  # 目标 CSV 文件名
+  result_folder_template: "{num_radar}R{num_target}T-result %Y-%m-%d %H-%M-%S"  # 结果文件夹格式
