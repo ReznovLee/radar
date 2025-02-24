@@ -208,9 +208,9 @@ class AircraftTargetModel(TargetModel):
         disturbance = np.random.normal(0, 0.5, 3) * time_step
         self.velocity_ms += disturbance * time_step
 
-        if self.target_position < self.MIN_ALTITUDE:
+        if self.target_position[2] < self.MIN_ALTITUDE:
             self.velocity_ms[2] = abs(self.velocity_ms[2])
-        elif self.target_position > self.MAX_ALTITUDE:
+        elif self.target_position[2] > self.MAX_ALTITUDE:
             self.velocity_ms[2] = -abs(self.velocity_ms[2])
 
         self.target_position += self.velocity_ms * time_step

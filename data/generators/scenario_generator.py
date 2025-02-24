@@ -22,6 +22,7 @@ from core.models.target_model import (
     MACH_2_MS
 )
 
+
 def load_config(yaml_file):
     """ Load configuration from yaml file
 
@@ -75,8 +76,8 @@ def generate_radars(num_radars, radar_network_center_str, aggregation_rate):
 
     z_coordinates = 0
 
-    min_radius_range = 0
-    max_radius_range = 5000000
+    min_radius_range = 30000
+    max_radius_range = 50000
     min_channel_number = 7
     max_channel_number = 10
 
@@ -271,7 +272,23 @@ def generate_trajectory_points(target, samples, dt, targets_data):
         target.update_position(dt)
 
 
-def save_targets_2_csv(targets_data, output_file='targets_data.csv'):
+def save_targets_2_csv(targets_data, target_folder_path, target_file_name):
+    """ Save targets to csv file
+
+        Save the generated target data to a csv file.
+
+        :param targets_data: list of targets
+        :param target_folder_path: path to save the csv file
+        :param target_file_name: name of the csv file
+    """
+    if target_folder_path:
+        os.makedirs(target_folder_path, exist_ok=True)
+        target_file_path = os.path.join(target_folder_path, target_file_name)
+    else:
+        target_file_path = target_file_name
+    # os.makedirs(target_folder_path, exist_ok=True)
+    # target_file_path = os.path.join(target_folder_path, target_file_name)
+
     expanded_data = []
     for target in targets_data:
         expanded_target = {
@@ -287,11 +304,11 @@ def save_targets_2_csv(targets_data, output_file='targets_data.csv'):
             'priority': target['priority']
         }
         expanded_data.append(expanded_target)
-        df = pd.DataFrame(expanded_data)
-        df = df.sort_values(['id', 'timestep'])
-        os.makedirs(os.path.dirname(output_file) or '.', exist_ok=True)
-        df.to_csv(output_file, index=False)
-        print(f'The target data has been saved to: {output_file}')
+
+    df = pd.DataFrame(expanded_data)
+    df = df.sort_values(['id', 'timestep'])
+    df.to_csv(target_file_path, index=False)
+    print(f'The target data has been saved to: {target_file_path}')
 
 
 def generate_scenario():
@@ -304,22 +321,22 @@ def generate_scenario():
     num_radars = config['num_radars']
     radar_center = config['radar_network_center']
     radar_aggregation_rate = config['radar_aggregation_rate']
-    target_ratio = config['target_ratio']
     target_drop_position = config["radar_network_center"]
     target_aggregation_rate = config["target_aggregation_rate"]
 
-    target_counts = compute_target_counts(num_targets, target_ratio)
-
+    # 创建输出文件夹
     current_date = datetime.now().strftime('%Y-%m-%d')
     output_folder_path = f"scenario-{current_date}"
 
+    # 生成并保存雷达数据
     radars = generate_radars(num_radars, radar_center, radar_aggregation_rate)
     radar_file_name = config["output"]["radar_filename_template"].format(num_radars=num_radars)
     save_radars_2_csv(radars, output_folder_path, radar_file_name)
 
+    # 生成并保存目标数据
     targets = generate_random_targets(target_drop_position, target_aggregation_rate)
     target_file_name = config["output"]["target_filename_template"].format(num_targets=num_targets)
-    save_targets_2_csv(targets, output_folder_path)
+    save_targets_2_csv(targets, output_folder_path, target_file_name)
 
 
 if __name__ == '__main__':
