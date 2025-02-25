@@ -15,6 +15,7 @@ import yaml
 import pandas as pd
 
 import core.models.target_model
+import core.models.radar_model
 from core.models.target_model import (
     BallisticMissileTargetModel,
     CruiseMissileTargetModel,
@@ -38,7 +39,7 @@ def load_config(yaml_file):
     return config
 
 
-def generate_radars(num_radars, radar_network_center_str, aggregation_rate):
+def generate_radars():
     """ Generate radars using parameter configuration
 
     The radar list was generated according to the parameters and configuration information, and the center point of
@@ -46,20 +47,19 @@ def generate_radars(num_radars, radar_network_center_str, aggregation_rate):
     constructed according to the aggregation rate of each radar, and then the corresponding channel number and
     radiation range were randomly generated.
 
-    :param num_radars: number of radars parameter from yaml file
-    :param radar_network_center_str: center of radar network, Represents the center coordinates of the radar network,
-                                    which facilitates the construction of the radar scene
-    :param aggregation_rate: aggregation rate, Represents the degree of radar aggregation, and the value ranges
-                                from (0,1], where 0 means that all radars are in one point, and 1 means that all radars
-                                are completely scattered without coincidence.
     :return: list of radars, each radar contains center coordinates, radiation range and number of channels.
     """
-    if not 0 < aggregation_rate <= 1:
+    config = load_config('param_config.yaml')
+    num_radars = config["num_radars"]
+    radar_network_center_str = config["radar_network_center_str"]
+    radar_aggregation_rate = config["radar_aggregation_rate"]
+
+    if not 0 < radar_aggregation_rate <= 1:
         raise ValueError('The aggregation rate must be between 0 and 1.')
     if num_radars <= 0:
         raise ValueError('The number of radars must be greater than 0.')
 
-    distribution_range = 1000 * aggregation_rate
+    distribution_range = 1000 * radar_aggregation_rate
 
     radar_network_center = np.array([float(x.strip()) for x in radar_network_center_str.strip('()').split(',')])
 
@@ -153,18 +153,23 @@ def generate_random_targets(center_drop_position_str, dispersion_rate):
     if not 0 < dispersion_rate <= 1:
         raise ValueError("dispersion_rate must between 0 to 1")
 
+    # The mach speed of 3 type of targets
     BALLISTIC_MISSILE_MACH = 8.0
     CRUISE_MISSILE_MACH = 0.8
     AIRCRAFT_MACH = 1.5
+
+    # The speed of 3 type of targets
     ballistic_missile_ms = BALLISTIC_MISSILE_MACH * MACH_2_MS
     cruise_missile_ms = CRUISE_MISSILE_MACH * MACH_2_MS
     aircraft_ms = AIRCRAFT_MACH * MACH_2_MS
 
+    # Sample param data
     BASE_SAMPLE_POINTS = 100
     ballistic_samples = BASE_SAMPLE_POINTS
     cruise_samples = int(BASE_SAMPLE_POINTS * (BALLISTIC_MISSILE_MACH / CRUISE_MISSILE_MACH))
     aircraft_samples = int(BASE_SAMPLE_POINTS * (BALLISTIC_MISSILE_MACH / AIRCRAFT_MACH))
 
+    # Load scenario config
     config = load_config("param_config.yaml")
     num_targets = config["num_targets"]
     target_ratio = config["target_ratio"]
@@ -188,16 +193,36 @@ def generate_random_targets(center_drop_position_str, dispersion_rate):
 
         time_to_impact = 100
         gravity = core.models.target_model.BallisticMissileTargetModel.GRAVITY
-        initial_z = 20000
+        min_elevation = np.arctan(gravity[2] * time_to_impact / (2 * ballistic_missile_ms))
+        max_elevation = np.pi / 3
+
+        elevation_angle = np.random.uniform(
+            min_elevation,
+            max_elevation,
+            num_counts["ballistic_missile"]
+        )
+
+        initial_z = 0.5 * abs(gravity[2]) * time_to_impact * time_to_impact * np.tan(elevation_angle)
+        horizontal_distance = ballistic_missile_ms * time_to_impact * np.cos(elevation_angle)
+
+        delta_x = drop_point[0] - center_drop_position[0]
+        delta_y = drop_point[1] - center_drop_position[1]
+        azimuth_angle = np.arctan2(
+            delta_y,
+            delta_x,
+            num_counts["ballistic_missile"]
+        )
+
         initial_position = np.array([
-            drop_point[0] - ballistic_missile_ms * time_to_impact,
-            drop_point[1],
+            drop_point[0] - horizontal_distance * np.cos(azimuth_angle),
+            drop_point[1] - horizontal_distance * np.sin(azimuth_angle),
             initial_z
         ])
+
         initial_velocity = np.array([
-            ballistic_missile_ms,
-            0,
-            -np.sqrt(2 * gravity[2] * initial_z)
+            ballistic_missile_ms * np.cos(elevation_angle) * np.cos(azimuth_angle),
+            ballistic_missile_ms * np.cos(elevation_angle) * np.sin(azimuth_angle),
+            ballistic_missile_ms * np.sin(elevation_angle)
         ])
 
         target = BallisticMissileTargetModel(current_id, initial_position, initial_velocity)
@@ -212,16 +237,50 @@ def generate_random_targets(center_drop_position_str, dispersion_rate):
             0
         ])
 
-        cruise_altitude = 8000
+        cruise_altitude = 3000
+        time_to_impact = 100
+        gravity = core.models.target_model.BallisticMissileTargetModel.GRAVITY
+        rocket_acceleration = MACH_2_MS
+
+        delta_x = drop_point[0] - center_drop_position[0]
+        delta_y = drop_point[1] - center_drop_position[1]
+        direction = np.array([delta_x, delta_y]) / np.sqrt(delta_x**2 + delta_y**2)
+        cruise_end_point = drop_point - direction * 500
+
+         # 计算俯冲阶段时间（使用加速度公式）
+        dive_distance = np.sqrt(cruise_altitude**2 + 500**2)  # 俯冲阶段运动距离
+        total_acceleration = np.sqrt(gravity[2]**2 + rocket_acceleration**2)  # 合加速度
+        dive_time = np.sqrt(2 * dive_distance / total_acceleration)  # 俯冲时间
+
+        # 计算巡航阶段时间和初始位置
+        cruise_time = time_to_impact - dive_time
+        cruise_distance = np.linalg.norm([delta_x, delta_y]) - 500  # 巡航总距离
+        
+        # 初始位置（从落点反推）
         initial_position = np.array([
-            drop_point[0] - cruise_missile_ms * 100,
-            drop_point[1],
+            cruise_end_point[0] - direction[0] * cruise_distance,
+            cruise_end_point[1] - direction[1] * cruise_distance,
             cruise_altitude
         ])
-        initial_velocity = np.array([cruise_missile_ms, 0, 0])
 
-        target = CruiseMissileTargetModel(current_id, initial_position, initial_velocity)
-        cruise_dt = 100 / cruise_samples
+        # 初始速度（巡航阶段平均速度）
+        initial_velocity = np.array([
+            cruise_missile_ms * direction[0],
+            cruise_missile_ms * direction[1],
+            0
+        ])
+
+        # 创建目标并生成轨迹
+        target = CruiseMissileTargetModel(
+            current_id, 
+            initial_position, 
+            initial_velocity,
+            cruise_end_point=cruise_end_point,  # 需要在模型中添加这些参数
+            dive_time=dive_time,
+            cruise_time=cruise_time,
+            rocket_acceleration=rocket_acceleration
+        )
+        cruise_dt = time_to_impact / cruise_samples
         generate_trajectory_points(target, cruise_samples, cruise_dt, targets_data)
         current_id += 1
 
@@ -319,9 +378,7 @@ def generate_scenario():
 
     num_targets = config['num_targets']
     num_radars = config['num_radars']
-    radar_center = config['radar_network_center']
-    radar_aggregation_rate = config['radar_aggregation_rate']
-    target_drop_position = config["radar_network_center"]
+    target_drop_position = config["radar_network_center_str"]
     target_aggregation_rate = config["target_aggregation_rate"]
 
     # 创建输出文件夹
@@ -329,7 +386,7 @@ def generate_scenario():
     output_folder_path = f"scenario-{current_date}"
 
     # 生成并保存雷达数据
-    radars = generate_radars(num_radars, radar_center, radar_aggregation_rate)
+    radars = generate_radars()
     radar_file_name = config["output"]["radar_filename_template"].format(num_radars=num_radars)
     save_radars_2_csv(radars, output_folder_path, radar_file_name)
 
