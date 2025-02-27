@@ -232,11 +232,14 @@ class AircraftTargetModel(TargetModel):
         """
         self.velocity_ms = self.velocity_mach * MACH_2_MS
         disturbance = np.random.normal(0, 0.5, 3) * time_step
-        self.velocity_ms += disturbance * time_step
+        self.velocity_ms += disturbance
 
-        if self.target_position[2] < self.MIN_ALTITUDE:
-            self.velocity_ms[2] = abs(self.velocity_ms[2])
-        elif self.target_position[2] > self.MAX_ALTITUDE:
-            self.velocity_ms[2] = -abs(self.velocity_ms[2])
+        height_margin = 200
+        adjustment_acceleration = 5
+
+        if self.target_position[2] < self.MIN_ALTITUDE + height_margin:
+            self.velocity_ms[2] += adjustment_acceleration * time_step
+        elif self.target_position[2] > self.MAX_ALTITUDE - height_margin:
+            self.velocity_ms[2] -= adjustment_acceleration * time_step
 
         self.target_position += self.velocity_ms * time_step
