@@ -107,9 +107,9 @@ class BallisticMissileTargetModel(TargetModel):
 
         :param time_step: Time step
         """
+        self.velocity_ms = self.velocity_mach * MACH_2_MS
         self.velocity_ms += self.GRAVITY * time_step
         self.target_position += self.velocity_ms * time_step
-        self.velocity_ms = self.velocity_mach * MACH_2_MS
 
 
 class CruiseMissileTargetModel(TargetModel):
@@ -123,12 +123,18 @@ class CruiseMissileTargetModel(TargetModel):
         target_id:          The unique ID of the target, inherited from the TargetModel class.
         target_position:    The 3D coordinates of the target, inherited from the TargetModel class.
         velocity_mach:      The target velocity (in Mach), inherited from the TargetModel class.
-
+        cruise_end_point:   The cruise end point of the cruise missile phase.
+        dive_time:          The dive time of the cruise phase.
+        cruise_time:        The cruise time of the cruise phase.
+        rocket_acceleration:The rocket acceleration of the cruise phase.
     """
     PRIORITY = 2
     CRUISE_ALTITUDE = 8000
+    GRAVITY = np.array([0, 0, 9.81])
+    TRANSITION_DISTANCE = 500
 
-    def __init__(self, target_id, target_position, velocity_mach):
+    def __init__(self, target_id, target_position, velocity_mach, cruise_end_point, dive_time, cruise_time,
+                 rocket_acceleration):
         """ Initializes the target model.
 
         Initialization of the cruise missile target model class, including properties and methods of the target.
@@ -136,10 +142,17 @@ class CruiseMissileTargetModel(TargetModel):
         :param target_id: Target ID
         :param target_position: Target position
         :param velocity_mach: Mach is the speed in units
+        :param cruise_end_point: Cruise end point
+        :param dive_time: Dive time
+        :param cruise_time: Cruise time
         """
         super().__init__(target_id, target_position, velocity_mach, "cruise_missile", self.PRIORITY)
-        self.current_phase = "climb"
+        self.current_phase = "cruise"
         self._disturbance_cache = np.zeros(2)
+        self.cruise_end_point = np.array(cruise_end_point)
+        self.dive_time = dive_time
+        self.cruise_time = cruise_time
+        self.rocket_acceleration = rocket_acceleration
 
     def _apply_disturbance(self, time_step):
         """ Apply disturbance to the cruise phase.
@@ -149,7 +162,18 @@ class CruiseMissileTargetModel(TargetModel):
 
         :param time_step: Time step
         """
-        self._disturbance_cache = np.random.normal(0, 0.5, 2) * time_step
+        self._disturbance_cache = np.random.normal(0, 0.8, 2) * time_step
+        self.velocity_ms[:2] += self._disturbance_cache
+        self.target_position[2] = self.CRUISE_ALTITUDE
+
+    def _check_phase_transition(self, current_position):
+        """ Check if missile should transition from cruise to dive phase
+
+        :param current_position: Current missile position
+        :return: True if missile should transition, False otherwise
+        """
+        horizontal_distance = np.linalg.norm(current_position[:2] - self.cruise_end_point[:2])
+        return horizontal_distance <= self.TRANSITION_DISTANCE
 
     def update_position(self, time_step):
         """Updates the target position based on the time step.
@@ -158,17 +182,17 @@ class CruiseMissileTargetModel(TargetModel):
 
         :param time_step: Time step
         """
+        self.velocity_ms = self.velocity_mach / MACH_2_MS
         if self.current_phase == "cruise":
             self._apply_disturbance(time_step)
-            self.velocity_ms[:2] += self._disturbance_cache
+            self.target_position += self.velocity_ms * time_step
 
-            if np.random.rand() < 0.01:
+            if self._check_phase_transition(self.target_position):
                 self.current_phase = "dive"
         elif self.current_phase == "dive":
-            self.velocity_ms[2] = -100
-
-        self.target_position += self.velocity_ms * time_step
-        self.velocity_ms = self.velocity_mach / MACH_2_MS
+            total_acceleration = self.GRAVITY + np.array([0, 0, -self.rocket_acceleration])
+            self.velocity_ms += total_acceleration * time_step
+            self.target_position += self.velocity_ms * time_step
 
 
 class AircraftTargetModel(TargetModel):
@@ -182,10 +206,9 @@ class AircraftTargetModel(TargetModel):
         velocity_mach:      The aircraft target velocity (in Mach), inherited from the TargetModel class.
 
     """
-    PRIORITY = 3
-    MIN_ALTITUDE = 900
-    MAX_ALTITUDE = 8100
-    MAX_DISTURBANCE = 2.0
+    PRIORITY = 2
+    MIN_ALTITUDE = 5000
+    MAX_ALTITUDE = 10000
 
     def __init__(self, target_id, target_position, velocity_mach):
         """ Initializes the aircraft target model.
@@ -197,6 +220,8 @@ class AircraftTargetModel(TargetModel):
         :param velocity_mach: Mach is the speed in units.
         """
         super().__init__(target_id, target_position, velocity_mach, "Aircraft", self.PRIORITY)
+        self.min_altitude = self.MIN_ALTITUDE
+        self.max_altitude = self.MAX_ALTITUDE
 
     def update_position(self, time_step):
         """Updates the target position based on the time step.
@@ -205,6 +230,7 @@ class AircraftTargetModel(TargetModel):
 
         :param time_step: Time step
         """
+        self.velocity_ms = self.velocity_mach * MACH_2_MS
         disturbance = np.random.normal(0, 0.5, 3) * time_step
         self.velocity_ms += disturbance * time_step
 
@@ -214,4 +240,3 @@ class AircraftTargetModel(TargetModel):
             self.velocity_ms[2] = -abs(self.velocity_ms[2])
 
         self.target_position += self.velocity_ms * time_step
-        self.velocity_mach = self.velocity_ms / MACH_2_MS
