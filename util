@@ -1,0 +1,127 @@
+target_model.py
+
+# 在文件末尾添加以下方法
+
+def generate_ballistic_missile(target_id, drop_point, time_to_impact=100):
+    """生成弹道导弹目标"""
+    gravity = BallisticMissileTargetModel.GRAVITY
+    velocity_ms = BASE_BALLISTIC_MACH * MACH_2_MS
+    
+    min_elevation = np.arctan(abs(gravity[2]) * time_to_impact / (2 * velocity_ms))
+    elevation_angle = np.random.uniform(min_elevation, np.pi / 3)
+    
+    initial_z = 0.5 * abs(gravity[2]) * time_to_impact * time_to_impact * np.tan(elevation_angle)
+    horizontal_distance = velocity_ms * time_to_impact * np.cos(elevation_angle)
+    
+    azimuth_angle = np.arctan2(drop_point[1], drop_point[0])
+    
+    initial_position = np.array([
+        drop_point[0] - horizontal_distance * np.cos(azimuth_angle),
+        drop_point[1] - horizontal_distance * np.sin(azimuth_angle),
+        initial_z
+    ])
+    
+    initial_velocity = np.array([
+        velocity_ms * np.cos(elevation_angle) * np.cos(azimuth_angle),
+        velocity_ms * np.cos(elevation_angle) * np.sin(azimuth_angle),
+        velocity_ms * np.sin(elevation_angle)
+    ])
+    
+    return BallisticMissileTargetModel(target_id, initial_position, initial_velocity)
+
+def generate_cruise_missile(target_id, drop_point, cruise_altitude=3000, time_to_impact=100):
+    """生成巡航导弹目标"""
+    velocity_ms = BASE_CRUISE_MACH * MACH_2_MS
+    rocket_acceleration = MACH_2_MS
+    
+    direction = drop_point[:2] / np.linalg.norm(drop_point[:2])
+    cruise_end_point = drop_point - direction * TRANSITION_DISTANCE
+    
+    dive_distance = np.sqrt(cruise_altitude**2 + TRANSITION_DISTANCE**2)
+    total_acceleration = np.sqrt(GRAVITY[2]**2 + rocket_acceleration**2)
+    dive_time = np.sqrt(2 * dive_distance / total_acceleration)
+    cruise_time = time_to_impact - dive_time
+    
+    initial_position = np.array([
+        cruise_end_point[0] - direction[0] * cruise_distance,
+        cruise_end_point[1] - direction[1] * cruise_distance,
+        cruise_altitude
+    ])
+    
+    initial_velocity = np.array([
+        velocity_ms * direction[0],
+        velocity_ms * direction[1],
+        0
+    ])
+    
+    return CruiseMissileTargetModel(
+        target_id, 
+        initial_position, 
+        initial_velocity,
+        cruise_end_point,
+        dive_time,
+        cruise_time,
+        rocket_acceleration
+    )
+
+def generate_aircraft(target_id, target_point, flight_time=100):
+    """生成战斗机目标"""
+    velocity_ms = BASE_AIRCRAFT_MACH * MACH_2_MS
+    
+    direction = target_point[:2] / np.linalg.norm(target_point[:2])
+    
+    initial_position = np.array([
+        target_point[0] - direction[0] * velocity_ms * flight_time,
+        target_point[1] - direction[1] * velocity_ms * flight_time,
+        np.random.uniform(MIN_ALTITUDE, MAX_ALTITUDE)
+    ])
+    
+    initial_velocity = np.array([
+        velocity_ms * direction[0],
+        velocity_ms * direction[1],
+        np.random.uniform(-50, 50)
+    ])
+    
+    return AircraftTargetModel(target_id, initial_position, initial_velocity)
+
+scenario_generator.py
+
+def generate_random_targets(center_drop_position_str, dispersion_rate):
+    """生成随机目标"""
+    if not 0 < dispersion_rate <= 1:
+        raise ValueError("dispersion_rate must between 0 to 1")
+
+    config = load_config("param_config.yaml")
+    num_targets = config["num_targets"]
+    target_ratio = config["target_ratio"]
+    num_counts = compute_target_counts(num_targets, target_ratio)
+    
+    distribution_range = 1000 * dispersion_rate
+    targets_data = []
+    current_id = 1
+    
+    center_drop_position = np.array([float(x.strip()) for x in center_drop_position_str.strip('()').split(',')])
+    
+    # 生成弹道导弹目标
+    for _ in range(num_counts["ballistic_missile"]):
+        drop_point = generate_random_drop_point(center_drop_position, distribution_range)
+        target = target_model.generate_ballistic_missile(current_id, drop_point)
+        generate_trajectory_points(target, BASE_SAMPLE_POINTS, 1.0, targets_data)
+        current_id += 1
+    
+    # 生成巡航导弹目标
+    for _ in range(num_counts["cruise_missile"]):
+        drop_point = generate_random_drop_point(center_drop_position, distribution_range)
+        target = target_model.generate_cruise_missile(current_id, drop_point)
+        generate_trajectory_points(target, BASE_SAMPLE_POINTS, 1.0, targets_data)
+        current_id += 1
+    
+    # 生成战斗机目标
+    for _ in range(num_counts["fighter_jet"]):
+        target_point = generate_random_target_point(center_drop_position, distribution_range)
+        target = target_model.generate_aircraft(current_id, target_point)
+        generate_trajectory_points(target, BASE_SAMPLE_POINTS, 1.0, targets_data)
+        current_id += 1
+    
+    targets_data.sort(key=lambda x: (x['id'], x['timestep']))
+    return targets_data
