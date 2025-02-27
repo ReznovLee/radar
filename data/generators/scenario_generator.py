@@ -198,8 +198,7 @@ def generate_random_targets(center_drop_position_str, dispersion_rate):
 
         elevation_angle = np.random.uniform(
             min_elevation,
-            max_elevation,
-            num_counts["ballistic_missile"]
+            max_elevation
         )
 
         initial_z = 0.5 * abs(gravity[2]) * time_to_impact * time_to_impact * np.tan(elevation_angle)
@@ -209,8 +208,7 @@ def generate_random_targets(center_drop_position_str, dispersion_rate):
         delta_y = drop_point[1] - center_drop_position[1]
         azimuth_angle = np.arctan2(
             delta_y,
-            delta_x,
-            num_counts["ballistic_missile"]
+            delta_x
         )
 
         initial_position = np.array([
@@ -244,10 +242,11 @@ def generate_random_targets(center_drop_position_str, dispersion_rate):
 
         delta_x = drop_point[0] - center_drop_position[0]
         delta_y = drop_point[1] - center_drop_position[1]
-        direction = np.array([delta_x, delta_y]) / np.sqrt(delta_x**2 + delta_y**2)
+        direction_2d = np.array([delta_x, delta_y]) / np.sqrt(delta_x ** 2 + delta_y ** 2)
+        direction = np.array([direction_2d[0], direction_2d[1], 0])  # 扩展为3D向量，z分量为0
         cruise_end_point = drop_point - direction * 500
 
-         # 计算俯冲阶段时间（使用加速度公式）
+        # 计算俯冲阶段时间（使用加速度公式）
         dive_distance = np.sqrt(cruise_altitude**2 + 500**2)  # 俯冲阶段运动距离
         total_acceleration = np.sqrt(gravity[2]**2 + rocket_acceleration**2)  # 合加速度
         dive_time = np.sqrt(2 * dive_distance / total_acceleration)  # 俯冲时间
@@ -275,7 +274,7 @@ def generate_random_targets(center_drop_position_str, dispersion_rate):
             current_id, 
             initial_position, 
             initial_velocity,
-            cruise_end_point=cruise_end_point,  # 需要在模型中添加这些参数
+            cruise_end_point=cruise_end_point,
             dive_time=dive_time,
             cruise_time=cruise_time,
             rocket_acceleration=rocket_acceleration
@@ -288,17 +287,31 @@ def generate_random_targets(center_drop_position_str, dispersion_rate):
         target_point = np.array([
             center_drop_position[0] + np.random.uniform(-distribution_range, distribution_range),
             center_drop_position[1] + np.random.uniform(-distribution_range, distribution_range),
-            np.random.uniform(900, 8100)
+            np.random.uniform(5000, 10000)
         ])
+
+        # 计算水平面上的飞行方向（只考虑x-y平面）
+        delta_x = target_point[0] - center_drop_position[0]
+        delta_y = target_point[1] - center_drop_position[1]
+        direction = np.array([delta_x, delta_y]) / np.sqrt(delta_x**2 + delta_y**2)
 
         initial_position = np.array([
-            target_point[0] - aircraft_ms * 100,
-            target_point[1],
-            target_point[2]
+            target_point[0] - direction[0] * aircraft_ms * 100,
+            target_point[1] - direction[1] * aircraft_ms * 100,
+            np.random.uniform(5000, 10000)
         ])
-        initial_velocity = np.array([aircraft_ms, 0, 0])
 
-        target = AircraftTargetModel(current_id, initial_position, initial_velocity)
+        initial_velocity = np.array([
+            aircraft_ms * direction[0],
+            aircraft_ms * direction[1],
+            np.random.uniform(-50, 50)
+        ])
+
+        target = AircraftTargetModel(
+            current_id, 
+            initial_position, 
+            initial_velocity
+        )
         aircraft_dt = 100 / aircraft_samples
         generate_trajectory_points(target, aircraft_samples, aircraft_dt, targets_data)
         current_id += 1

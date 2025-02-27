@@ -13,10 +13,10 @@ radar_aggregation_rate: 0.6
 target_aggregation_rate: 0.6
 
 # 雷达网络中心坐标
-radar_network_center: (500, 500, 0)
+radar_network_center_str: (1000, 1000, 0)
 
 # 目标落点中心坐标
-center_drop_position: (500, 500, 0)
+center_drop_position: (1000, 1000, 0)
 
 # 目标类型比例（百分比，总和应为1.0）
 target_ratio:
