@@ -10,6 +10,7 @@
 import numpy as np
 
 MACH_2_MS = 340  # Mach conversion standard unit
+GRAVITY = np.array([0, 0, -9.81])
 
 
 class TargetModel:
@@ -85,7 +86,6 @@ class BallisticMissileTargetModel(TargetModel):
     """
 
     PRIORITY = 1
-    GRAVITY = np.array([0, 0, -9.81])
     AIR_RESISTANCE_COEF = 0.5
 
     def __init__(self, target_id, target_position, velocity_mach):
@@ -125,12 +125,10 @@ class BallisticMissileTargetModel(TargetModel):
         self.velocity_ms = self.velocity_mach * MACH_2_MS
 
         air_resistance = self._calculate_air_resistance()
-        self.acceleration = self.GRAVITY + air_resistance
+        self.acceleration = GRAVITY + air_resistance
 
         self.velocity_ms += self.acceleration * time_step
         self.target_position += self.velocity_ms * time_step
-
-        self.velocity_mach = self.velocity_ms / MACH_2_MS
 
 
 class CruiseMissileTargetModel(TargetModel):
@@ -151,7 +149,6 @@ class CruiseMissileTargetModel(TargetModel):
     """
     PRIORITY = 2
     CRUISE_ALTITUDE = 8000
-    GRAVITY = np.array([0, 0, 9.81])
     TRANSITION_DISTANCE = 500
     AIR_RESISTANCE_COEF = 0.2
     DISTURBANCE_SCALE = 0.8
@@ -215,7 +212,7 @@ class CruiseMissileTargetModel(TargetModel):
         if distance > 0:
             direction_to_target = direction_to_target / distance
 
-        dive_acceleration = (self.rocket_acceleration * direction_to_target + self.GRAVITY)
+        dive_acceleration = (self.rocket_acceleration * direction_to_target + GRAVITY)
 
         return dive_acceleration
 

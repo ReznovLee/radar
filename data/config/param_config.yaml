@@ -22,7 +22,13 @@ center_drop_position: (1000, 1000, 0)
 target_ratio:
   ballistic_missile: 0.1  # 10% 弹道导弹
   cruise_missile: 0.4     # 40% 巡航导弹
-  fighter_jet: 0.4        # 40% 战斗机
+  aircraft: 0.4        # 40% 战斗机
+
+# Target Speed (mach)
+speed:
+  ballistic_speed: 8.0  # 弹道导弹速度（马赫）
+  cruise_speed: 0.8  # 巡航导弹速度（马赫）
+  aircraft_speed: 1.5  # 战斗机速度（马赫）
 
 # 仿真时间参数
 simulation:
