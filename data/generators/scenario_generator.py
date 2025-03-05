@@ -230,7 +230,7 @@ def generate_random_targets(center_drop_position_str, dispersion_rate, time_to_i
 
         cruise_altitude = 3000
         dive_distance_horizontal = 500
-        rocket_acceleration = 340
+        rocket_acceleration = 5
 
         delta_x = drop_point[0] - center_drop_position[0]
         delta_y = drop_point[1] - center_drop_position[1]

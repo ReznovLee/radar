@@ -109,7 +109,7 @@ class BallisticMissileTargetModel(TargetModel):
         """
         velocity_magnitude = np.linalg.norm(self.velocity_ms)
         if velocity_magnitude > 0:
-            resistance = -self.AIR_RESISTANCE_COEF * velocity_magnitude * self.velocity_ms
+            resistance = -self.AIR_RESISTANCE_COEF * velocity_magnitude
             return resistance
         return np.zeros(3)
 
@@ -208,7 +208,7 @@ class CruiseMissileTargetModel(TargetModel):
         if distance > 0:
             direction_to_target = direction_to_target / distance
 
-        dive_acceleration = (self.rocket_acceleration * direction_to_target + GRAVITY)
+        dive_acceleration = (self.rocket_acceleration * direction_to_target)
 
         return dive_acceleration
 
