@@ -24,17 +24,17 @@ target_ratio:
   cruise_missile: 0.4     # 40% 巡航导弹
   aircraft: 0.4        # 40% 战斗机
 
-# Target Speed (mach)
+# Target Speed (ms)
 speed:
-  ballistic_speed: 8.0  # 弹道导弹速度（马赫）
-  cruise_speed: 0.8  # 巡航导弹速度（马赫）
-  aircraft_speed: 1.5  # 战斗机速度（马赫）
+  ballistic_speed: 5500  # 弹道导弹速度
+  cruise_speed: 340  # 巡航导弹速度
+  aircraft_speed: 800  # 战斗机速度
 
 # 仿真时间参数
 simulation:
-  total_time: 100   # 总仿真时间（秒）
-  time_step: 1    # 每个时间步长（秒）
-  algorithm_step: 10.0  # 每次态势融合时间（秒）
+  total_time: 1000   # 总仿真时间（秒）
+  time_step: 10    # 每个时间步长（秒）
+  algorithm_step: 20.0  # 每次态势融合时间（秒）
 
 # 输出文件夹和文件命名
 output:

@@ -19,7 +19,6 @@ from core.models.target_model import (
     BallisticMissileTargetModel,
     CruiseMissileTargetModel,
     AircraftTargetModel,
-    MACH_2_MS,
     GRAVITY
 )
 
@@ -155,22 +154,17 @@ def generate_random_targets(center_drop_position_str, dispersion_rate, time_to_i
     if not 0 < dispersion_rate <= 1:
         raise ValueError("dispersion_rate must between 0 to 1")
 
-    # The mach speed of 3 type of targets
+    # The speed of 3 type of targets
     config = load_config("param_config.yaml")
-    BALLISTIC_MISSILE_MACH = config["speed"]["ballistic_speed"]
-    CRUISE_MISSILE_MACH = config["speed"]["cruise_speed"]
-    AIRCRAFT_MACH = config["speed"]["aircraft_speed"]
-
-    # The standard speed of 3 type of targets
-    ballistic_missile_ms = BALLISTIC_MISSILE_MACH * MACH_2_MS
-    cruise_missile_ms = CRUISE_MISSILE_MACH * MACH_2_MS
-    aircraft_ms = AIRCRAFT_MACH * MACH_2_MS
+    ballistic_missile_ms = config["speed"]["ballistic_speed"]
+    cruise_missile_ms = config["speed"]["cruise_speed"]
+    aircraft_ms = config["speed"]["aircraft_speed"]
 
     # Sample param data
     BASE_SAMPLE_POINTS = 100
     ballistic_samples = BASE_SAMPLE_POINTS
-    cruise_samples = int(BASE_SAMPLE_POINTS * (BALLISTIC_MISSILE_MACH / CRUISE_MISSILE_MACH))
-    aircraft_samples = int(BASE_SAMPLE_POINTS * (BALLISTIC_MISSILE_MACH / AIRCRAFT_MACH))
+    cruise_samples = int(BASE_SAMPLE_POINTS * (ballistic_missile_ms / cruise_missile_ms))
+    aircraft_samples = int(BASE_SAMPLE_POINTS * (ballistic_missile_ms / aircraft_ms))
 
     # Load scenario config
     num_targets = config["num_targets"]
@@ -236,7 +230,7 @@ def generate_random_targets(center_drop_position_str, dispersion_rate, time_to_i
 
         cruise_altitude = 3000
         dive_distance_horizontal = 500
-        rocket_acceleration = MACH_2_MS
+        rocket_acceleration = 340
 
         delta_x = drop_point[0] - center_drop_position[0]
         delta_y = drop_point[1] - center_drop_position[1]

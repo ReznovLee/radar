@@ -9,7 +9,6 @@
 """
 import numpy as np
 
-MACH_2_MS = 340  # Mach conversion standard unit
 GRAVITY = np.array([0, 0, -9.81])
 
 
@@ -22,7 +21,7 @@ class TargetModel:
         target_id:      Each target has its own unique ID (int) that distinguishes it from each other.
         target_position: The 3D coordinates of the target at any time, and the specific kinematic equations follow
                             the description in the paper.
-        velocity_mach:  Here param_config.yaml takes an input parameter of Mach, which was used in paper to visualize
+        velocity_ms:    Here param_config.yaml takes an input parameter of M/S, which was used in paper to visualize
                             the speeds of the three targets.
         target_type:    It mainly includes three types: ballistic missiles, cruise missiles and fighter jets.
         priority:       Because of their different speeds and functions in combat,
@@ -30,21 +29,20 @@ class TargetModel:
                             level 1 (the most priority), Level 2 (the second priority), and Level 3 (the lowest level).
     """
 
-    def __init__(self, target_id, target_position, velocity_mach, target_type, priority):
+    def __init__(self, target_id, target_position, velocity_ms, target_type, priority):
         """ Initializes the target model.
 
         Initialization of the target model class, including properties and methods of the target.
 
         :param target_id: Target ID
         :param target_position: Target position
-        :param velocity_mach: Velocity mach
+        :param velocity_ms: Velocity ms
         :param target_type: Target type
         :param priority: Priority
         """
         self.target_id = target_id
         self.target_position = np.array(target_position, dtype=np.float64)
-        self.velocity_mach = np.array(velocity_mach, dtype=np.float64)
-        self.velocity_ms = self.velocity_mach * MACH_2_MS
+        self.velocity_ms = np.array(velocity_ms, dtype=np.float64)
         self.target_type = target_type
         self.priority = priority
 
@@ -69,7 +67,7 @@ class TargetModel:
             self.target_id,
             timestamp,
             self.target_position,
-            self.velocity_mach,
+            self.velocity_ms,
             self.target_type,
             self.priority]
 
@@ -82,13 +80,13 @@ class BallisticMissileTargetModel(TargetModel):
     Attributes:
         target_id:          The unique ID of the target, inherited from the TargetModel class.
         target_position:    The 3D coordinates of the target, inherited from the TargetModel class.
-        velocity_mach:      The target's velocity (in Mach), inherited from the TargetModel class.
+        velocity_ms:        The target's velocity (in M/S), inherited from the TargetModel class.
     """
 
     PRIORITY = 1
     AIR_RESISTANCE_COEF = 0.5
 
-    def __init__(self, target_id, target_position, velocity_mach):
+    def __init__(self, target_id, target_position, velocity_ms):
         """ Initializes the target model.
 
         Initialization of the ballistic missile target model class, including properties and methods of the target.
@@ -97,9 +95,9 @@ class BallisticMissileTargetModel(TargetModel):
 
         :param target_id: Target ID
         :param target_position: Target position
-        :param velocity_mach: Mach is the speed in units
+        :param velocity_ms: M/S is the speed in units
         """
-        super().__init__(target_id, target_position, velocity_mach, "Ballistic_Missile", self.PRIORITY)
+        super().__init__(target_id, target_position, velocity_ms, "Ballistic_Missile", self.PRIORITY)
         self.acceleration = np.zeros(3)
 
     def _calculate_air_resistance(self):
@@ -122,8 +120,6 @@ class BallisticMissileTargetModel(TargetModel):
 
         :param time_step: Time step
         """
-        self.velocity_ms = self.velocity_mach * MACH_2_MS
-
         air_resistance = self._calculate_air_resistance()
         self.acceleration = GRAVITY + air_resistance
 
@@ -141,7 +137,7 @@ class CruiseMissileTargetModel(TargetModel):
     Attributes:
         target_id:          The unique ID of the target, inherited from the TargetModel class.
         target_position:    The 3D coordinates of the target, inherited from the TargetModel class.
-        velocity_mach:      The target velocity (in Mach), inherited from the TargetModel class.
+        velocity_ms:        The target velocity (in M/S), inherited from the TargetModel class.
         cruise_end_point:   The cruise end point of the cruise missile phase.
         dive_time:          The dive time of the cruise phase.
         cruise_time:        The cruise time of the cruise phase.
@@ -153,7 +149,7 @@ class CruiseMissileTargetModel(TargetModel):
     AIR_RESISTANCE_COEF = 0.2
     DISTURBANCE_SCALE = 0.8
 
-    def __init__(self, target_id, target_position, velocity_mach, cruise_end_point, dive_time, cruise_time,
+    def __init__(self, target_id, target_position, velocity_ms, cruise_end_point, dive_time, cruise_time,
                  rocket_acceleration):
         """ Initializes the target model.
 
@@ -161,12 +157,12 @@ class CruiseMissileTargetModel(TargetModel):
 
         :param target_id: Target ID
         :param target_position: Target position
-        :param velocity_mach: Mach is the speed in units
+        :param velocity_ms: M/S is the speed in units
         :param cruise_end_point: Cruise end point
         :param dive_time: Dive time
         :param cruise_time: Cruise time
         """
-        super().__init__(target_id, target_position, velocity_mach, "cruise_missile", self.PRIORITY)
+        super().__init__(target_id, target_position, velocity_ms, "cruise_missile", self.PRIORITY)
         self.current_phase = "cruise"
         self.cruise_end_point = np.array(cruise_end_point)
         self.dive_time = dive_time
@@ -232,7 +228,6 @@ class CruiseMissileTargetModel(TargetModel):
 
         :param time_step: Time step
         """
-        self.velocity_ms = self.velocity_mach / MACH_2_MS
         air_resistance = self._calculate_air_resistance()
 
         if self.current_phase == "cruise":
@@ -242,11 +237,9 @@ class CruiseMissileTargetModel(TargetModel):
         else:  # dive phase
             control_acceleration = self._apply_dive_control()
 
-        self.acceleration = control_acceleration + air_resistance / MACH_2_MS
+        self.acceleration = control_acceleration + air_resistance
         self.velocity_ms += self.acceleration * time_step
         self.target_position += self.velocity_ms * time_step
-
-        self.velocity_mach = self.velocity_ms / MACH_2_MS
 
 
 class AircraftTargetModel(TargetModel):
@@ -257,31 +250,31 @@ class AircraftTargetModel(TargetModel):
     Attributes:
         target_id:          The unique ID of the aircraft target, inherited from the TargetModel class.
         target_position:    The 3D coordinates of the aircraft target, inherited from the TargetModel class.
-        velocity_mach:      The aircraft target velocity (in Mach), inherited from the TargetModel class.
+        velocity_ms:        The aircraft target velocity (in M/S), inherited from the TargetModel class.
 
     """
     PRIORITY = 3
     MIN_ALTITUDE = 5000
     MAX_ALTITUDE = 10000
-    GRAVITY = np.array([0, 0, -9.81])
     AIR_RESISTANCE_COEF = 0.1
     TURN_RATE_MAX = 0.1
     VERTICAL_ACCELERATION = 5
 
-    def __init__(self, target_id, target_position, velocity_mach):
+    def __init__(self, target_id, target_position, velocity_ms):
         """ Initializes the aircraft target model.
 
         Initialization of the aircraft target model class, including properties and methods of the target.
 
         :param target_id: The unique ID of the aircraft target.
         :param target_position: The 3D coordinates of the aircraft target.
-        :param velocity_mach: Mach is the speed in units.
+        :param velocity_ms: M/S is the speed in units.
         """
-        super().__init__(target_id, target_position, velocity_mach, "Aircraft", self.PRIORITY)
+        super().__init__(target_id, target_position, velocity_ms, "Aircraft", self.PRIORITY)
         self.min_altitude = self.MIN_ALTITUDE
         self.max_altitude = self.MAX_ALTITUDE
         self.acceleration = np.zeros(3)
-        self.heading = np.random.uniform(0, 2 * np.pi)
+        self.yaw = np.random.uniform(0, 2 * np.pi)
+        self.pitch = np.random.uniform(-np.pi / 6, np.pi / 6)
 
     def _calculate_air_resistance(self):
         """ Calculate air resistance.
@@ -316,15 +309,20 @@ class AircraftTargetModel(TargetModel):
         :param time_step: Time step
         :return: Maneuver acceleration
         """
-        self.heading += np.random.uniform(-self.TURN_RATE_MAX, self.TURN_RATE_MAX)
+        self.yaw += np.random.uniform(-self.TURN_RATE_MAX, self.TURN_RATE_MAX)
+        self.pitch += np.random.uniform(-self.TURN_RATE_MAX / 2, self.TURN_RATE_MAX / 2)
 
         direction = np.array([
-            np.cos(self.heading),
-            np.sin(self.heading),
-            0
+            np.cos(self.pitch) * np.cos(self.yaw),
+            np.cos(self.pitch) * np.sin(self.yaw),
+            np.sin(self.pitch)
         ])
 
-        disturbance = np.random.normal(0, 0.3, 3) * time_step
+        disturbance = np.array([
+            np.random.normal(0, 0.3),  # x方向扰动
+            np.random.normal(0, 0.3),  # y方向扰动
+            np.random.normal(0, 0.1)  # z方向扰动（较小）
+        ]) * time_step  # 扰动与速度和时间步长相关
 
         return direction, disturbance
 
@@ -335,18 +333,36 @@ class AircraftTargetModel(TargetModel):
 
         :param time_step: Time step
         """
-        self.velocity_ms = self.velocity_mach * MACH_2_MS
         air_resistance = self._calculate_air_resistance()
-
         direction, disturbance = self._apply_maneuver(time_step)
-
         altitude_control = self._apply_altitude_control()
 
         speed = np.linalg.norm(self.velocity_ms)
-        self.velocity_ms = speed * direction + disturbance
-        self.acceleration = altitude_control + air_resistance
 
+        # 分别处理每个加速度分量，避免直接相加
+        if speed > 0 and time_step > 0:
+            desired_velocity = direction * speed
+            velocity_diff = desired_velocity - self.velocity_ms
+            maneuver_acceleration = np.nan_to_num(velocity_diff / time_step, nan=0.0, posinf=0.0, neginf=0.0)
+
+            # 分别处理每个加速度分量
+            disturbance_acceleration = np.nan_to_num(disturbance / time_step, nan=0.0, posinf=0.0, neginf=0.0)
+            air_resistance = np.nan_to_num(air_resistance, nan=0.0, posinf=0.0, neginf=0.0)
+            altitude_control = np.nan_to_num(altitude_control, nan=0.0, posinf=0.0, neginf=0.0)
+
+            # 安全地合成总加速度
+            self.acceleration = (
+                    maneuver_acceleration +
+                    altitude_control +
+                    air_resistance +
+                    disturbance_acceleration
+            )
+        else:
+            self.acceleration = np.nan_to_num(
+                altitude_control + air_resistance,
+                nan=0.0, posinf=0.0, neginf=0.0
+            )
+
+        # 更新速度和位置
         self.velocity_ms += self.acceleration * time_step
         self.target_position += self.velocity_ms * time_step
-
-        self.velocity_mach = self.velocity_ms / MACH_2_MS
