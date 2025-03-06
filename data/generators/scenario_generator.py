@@ -134,7 +134,7 @@ def compute_target_counts(num_targets, target_ratio):
     }
 
 
-def generate_random_targets(center_drop_position_str, dispersion_rate, time_to_impact):
+def generate_random_targets(center_drop_position_str, target_dispersion_rate, time_to_impact):
     """ Generate random targets
 
     The actual targets are generated based on the number of targets in each category. For the generation of the initial
@@ -147,24 +147,28 @@ def generate_random_targets(center_drop_position_str, dispersion_rate, time_to_i
     :param time_to_impact: time to impact
     :param center_drop_position_str: the landing center point coordinates of the target, and the path coordinates of the
                                     aircraft in the x_axis and y_axis direction
-    :param dispersion_rate: the dispersion of the target from the central drop point, the larger the value, the more
-                                dispersed.
+    :param target_dispersion_rate: the dispersion of the target from the central drop point, the larger the value, the
+                                    more dispersed.
     :return: list of random targets
     """
-    if not 0 < dispersion_rate <= 1:
+    if not 0 < target_dispersion_rate <= 1:
         raise ValueError("dispersion_rate must between 0 to 1")
 
     # The speed of 3 type of targets
     config = load_config("param_config.yaml")
-    ballistic_missile_ms = config["speed"]["ballistic_speed"]
-    cruise_missile_ms = config["speed"]["cruise_speed"]
-    aircraft_ms = config["speed"]["aircraft_speed"]
+    ballistic_missile_speed = config["speed"]["ballistic_speed"]
+    cruise_missile_speed = config["speed"]["cruise_speed"]
+    aircraft_speed = config["speed"]["aircraft_speed"]
+
+    # Sample param date
+    TOTAL_SAMPLE = 100
+    dt = TOTAL_SAMPLE / time_to_impact
 
     # Sample param data
-    BASE_SAMPLE_POINTS = 100
-    ballistic_samples = BASE_SAMPLE_POINTS
-    cruise_samples = int(BASE_SAMPLE_POINTS * (ballistic_missile_ms / cruise_missile_ms))
-    aircraft_samples = int(BASE_SAMPLE_POINTS * (ballistic_missile_ms / aircraft_ms))
+    # BASE_SAMPLE_POINTS = 100
+    # ballistic_samples = BASE_SAMPLE_POINTS
+    # cruise_samples = int(BASE_SAMPLE_POINTS * (ballistic_missile_speed / cruise_missile_speed))
+    # aircraft_samples = int(BASE_SAMPLE_POINTS * (ballistic_missile_speed / aircraft_speed))
 
     # Load scenario config
     num_targets = config["num_targets"]
@@ -174,57 +178,62 @@ def generate_random_targets(center_drop_position_str, dispersion_rate, time_to_i
     cruise_counts = num_counts["cruise_missile"]
     aircraft_counts = num_counts["aircraft"]
 
-    distribution_range = 1000 * dispersion_rate
+    target_distribution_range = 1000 * target_dispersion_rate
     targets_data = []
     current_id = 1
 
     center_drop_position = np.array([float(x.strip()) for x in center_drop_position_str.strip('()').split(',')])
 
     for _ in range(ballistic_counts):
+        # Every ballistic missiles' drop points confirm
         drop_point = np.array([
-            center_drop_position[0] + np.random.uniform(-distribution_range, distribution_range),
-            center_drop_position[1] + np.random.uniform(-distribution_range, distribution_range),
+            center_drop_position[0] + np.random.uniform(-target_distribution_range, target_distribution_range),
+            center_drop_position[1] + np.random.uniform(-target_distribution_range, target_distribution_range),
             0
         ])
 
-        gravity = GRAVITY
-        min_elevation = np.pi / 6
-        max_elevation = np.pi / 3
+        # Pitch angle range of ballistic missile
+        min_pitch_angle = np.pi / 6  # Minimum pitch angle of a ballistic missile
+        max_pitch_angle = np.pi / 3  # Maximal pitch angle of a ballistic missile
 
-        elevation_angle = - np.random.uniform(
-            min_elevation,
-            max_elevation
+        # Pitch angle of ballistic missile
+        pitch_angle = - np.random.uniform(
+            min_pitch_angle,
+            max_pitch_angle
         )
 
-        min_azimuth = - np.pi / 12
-        max_azimuth = - np.pi / 3
+        # Azimuth angle range of ballistic missile
+        min_azimuth_angle = - np.pi / 12
+        max_azimuth_angle = - np.pi / 3
 
+        # Azimuth angle of ballistic missile
         azimuth_angle = - np.random.uniform(
-            min_azimuth,
-            max_azimuth
+            min_azimuth_angle,
+            max_azimuth_angle
         )
 
+        # Velocity initial
         initial_velocity = np.array([
-            ballistic_missile_ms * np.cos(elevation_angle) * np.cos(azimuth_angle),
-            ballistic_missile_ms * np.cos(elevation_angle) * np.sin(azimuth_angle),
-            ballistic_missile_ms * np.sin(elevation_angle)
+            ballistic_missile_speed * np.cos(pitch_angle) * np.cos(azimuth_angle),
+            ballistic_missile_speed * np.cos(pitch_angle) * np.sin(azimuth_angle),
+            ballistic_missile_speed * np.sin(pitch_angle)
         ])
 
+        # Position initial
         initial_position = np.array([
             drop_point[0] - initial_velocity[0] * time_to_impact,
             drop_point[1] - initial_velocity[1] * time_to_impact,
-            (initial_velocity[2] + gravity[2]) * time_to_impact
+            (initial_velocity[2] + GRAVITY[2]) * time_to_impact
         ])
 
         target = BallisticMissileTargetModel(current_id, initial_position, initial_velocity)
-        ballistic_dt = time_to_impact / ballistic_samples
-        generate_trajectory_points(target, ballistic_samples, ballistic_dt, targets_data)
+        generate_trajectory_points(target, TOTAL_SAMPLE, dt, targets_data)
         current_id += 1
 
     for _ in range(cruise_counts):
         drop_point = np.array([
-            center_drop_position[0] + np.random.uniform(-distribution_range, distribution_range),
-            center_drop_position[1] + np.random.uniform(-distribution_range, distribution_range),
+            center_drop_position[0] + np.random.uniform(-target_distribution_range, target_distribution_range),
+            center_drop_position[1] + np.random.uniform(-target_distribution_range, target_distribution_range),
             0
         ])
 
@@ -258,8 +267,8 @@ def generate_random_targets(center_drop_position_str, dispersion_rate, time_to_i
 
         # 初始速度（巡航阶段平均速度）
         initial_velocity = np.array([
-            cruise_missile_ms * direction[0],
-            cruise_missile_ms * direction[1],
+            cruise_missile_speed * direction[0],
+            cruise_missile_speed * direction[1],
             0
         ])
 
@@ -273,14 +282,14 @@ def generate_random_targets(center_drop_position_str, dispersion_rate, time_to_i
             cruise_time=cruise_time,
             rocket_acceleration=rocket_acceleration
         )
-        cruise_dt = time_to_impact / cruise_samples
-        generate_trajectory_points(target, cruise_samples, cruise_dt, targets_data)
+
+        generate_trajectory_points(target, TOTAL_SAMPLE, dt, targets_data)
         current_id += 1
 
     for _ in range(aircraft_counts):
         target_end_point = np.array([
-            center_drop_position[0] + np.random.uniform(-distribution_range, distribution_range),
-            center_drop_position[1] + np.random.uniform(-distribution_range, distribution_range),
+            center_drop_position[0] + np.random.uniform(-target_distribution_range, target_distribution_range),
+            center_drop_position[1] + np.random.uniform(-target_distribution_range, target_distribution_range),
             np.random.uniform(5000, 13000)
         ])
 
@@ -290,14 +299,14 @@ def generate_random_targets(center_drop_position_str, dispersion_rate, time_to_i
         direction = np.array([delta_x, delta_y]) / np.sqrt(delta_x**2 + delta_y**2)
 
         initial_position = np.array([
-            target_end_point[0] - direction[0] * aircraft_ms * time_to_impact,
-            target_end_point[1] - direction[1] * aircraft_ms * time_to_impact,
+            target_end_point[0] - direction[0] * aircraft_speed * time_to_impact,
+            target_end_point[1] - direction[1] * aircraft_speed * time_to_impact,
             np.random.uniform(5000, 13000)
         ])
 
         initial_velocity = np.array([
-            aircraft_ms * direction[0],
-            aircraft_ms * direction[1],
+            aircraft_speed * direction[0],
+            aircraft_speed * direction[1],
             np.random.uniform(-50, 50)
         ])
 
@@ -306,8 +315,7 @@ def generate_random_targets(center_drop_position_str, dispersion_rate, time_to_i
             initial_position, 
             initial_velocity
         )
-        aircraft_dt = time_to_impact / aircraft_samples
-        generate_trajectory_points(target, aircraft_samples, aircraft_dt, targets_data)
+        generate_trajectory_points(target, TOTAL_SAMPLE, dt, targets_data)
         current_id += 1
 
     targets_data.sort(key=lambda x: (x['id'], x['timestep']))
@@ -324,18 +332,25 @@ def generate_trajectory_points(target, samples, dt, targets_data):
     :param dt: time step
     :param targets_data: target data
     """
-    for t in range(samples):
-        timestamp = t * dt
-        state = target.get_state(timestamp)
+    current_time = 0
+
+    for _ in range(samples):
+        # 记录当前状态
+        state = target.get_state(current_time)
         targets_data.append({
             'id': state[0],
-            'timestep': state[1],
-            'position': state[2],
-            'velocity': state[3],
+            'timestep': current_time,
+            'position': state[2].copy(),  # 使用copy避免引用问题
+            'velocity': state[3].copy(),
             'target_type': state[4],
             'priority': state[5]
         })
-        target.update_position(dt)
+
+        # 更新目标状态（位置和速度）
+        target.update_state(dt)
+
+        # 更新时间戳
+        current_time += dt
 
 
 def save_targets_2_csv(targets_data, target_folder_path, target_file_name):

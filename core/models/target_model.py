@@ -46,7 +46,7 @@ class TargetModel:
         self.target_type = target_type
         self.priority = priority
 
-    def update_position(self, time_step):
+    def update_state(self, time_step):
         """Updates the target position based on the time step.
 
         The position coordinates are updated in a linear manner.
@@ -95,7 +95,7 @@ class BallisticMissileTargetModel(TargetModel):
 
         :param target_id: Target ID
         :param target_position: Target position
-        :param velocity_ms: M/S is the speed in units
+        :param velocity_ms: Target speed
         """
         super().__init__(target_id, target_position, velocity_ms, "Ballistic_Missile", self.PRIORITY)
         self.acceleration = np.zeros(3)
@@ -113,7 +113,7 @@ class BallisticMissileTargetModel(TargetModel):
             return resistance
         return np.zeros(3)
 
-    def update_position(self, time_step):
+    def update_state(self, time_step):
         """Updates the target position based on the time step.
 
         The position coordinates are updated in a linear manner.
