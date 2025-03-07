@@ -335,21 +335,21 @@ def generate_trajectory_points(target, samples, dt, targets_data):
     current_time = 0
 
     for _ in range(samples):
-        # 记录当前状态
+        # Get current target state
         state = target.get_state(current_time)
         targets_data.append({
             'id': state[0],
             'timestep': current_time,
-            'position': state[2].copy(),  # 使用copy避免引用问题
+            'position': state[2].copy(),
             'velocity': state[3].copy(),
             'target_type': state[4],
             'priority': state[5]
         })
 
-        # 更新目标状态（位置和速度）
+        # Update target state
         target.update_state(dt)
 
-        # 更新时间戳
+        # Update timestamp
         current_time += dt
 
 
