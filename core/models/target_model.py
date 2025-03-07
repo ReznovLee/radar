@@ -212,14 +212,8 @@ class CruiseMissileTargetModel(TargetModel):
         Cruise missile needs to add disturbance in both cruise and reentry phase to meet the actual operational
         requirements.
         """
-        direction_to_target = self.cruise_end_point - self.target_position
-        distance = np.linalg.norm(direction_to_target)
-        if distance > 0:
-            direction_to_target = direction_to_target / distance
-
-        dive_acceleration = (self.rocket_acceleration * direction_to_target)
-
-        return dive_acceleration
+        acceleration = np.random.normal(0, self.DISTURBANCE_SCALE, 3)
+        return GRAVITY + self.rocket_acceleration + acceleration
 
     def _check_phase_transition(self, current_position):
         """ Check if missile should transition from cruise to dive phase
@@ -230,12 +224,12 @@ class CruiseMissileTargetModel(TargetModel):
         horizontal_distance = np.linalg.norm(current_position[:2] - self.cruise_end_point[:2])
         return horizontal_distance <= self.TRANSITION_DISTANCE
 
-    def update_position(self, time_step):
+    def update_position(self, delta_time):
         """Updates the target position based on the time step.
 
         The position coordinates are updated in a linear manner.
 
-        :param time_step: Time step
+        :param delta_time: Time step
         """
         air_resistance = self._calculate_air_resistance_acceleration()
 
@@ -246,9 +240,9 @@ class CruiseMissileTargetModel(TargetModel):
         else:  # dive phase
             control_acceleration = self._apply_dive_control()
 
-        self.acceleration = control_acceleration + air_resistance
-        self.velocity += self.acceleration * time_step
-        self.target_position += self.velocity * time_step
+        self.acceleration = control_acceleration - air_resistance
+        self.velocity += self.acceleration * delta_time
+        self.target_position += self.velocity * delta_time
 
 
 class AircraftTargetModel(TargetModel):

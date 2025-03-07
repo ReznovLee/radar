@@ -207,7 +207,7 @@ def generate_random_targets(center_drop_position_str, target_dispersion_rate, ti
         max_azimuth_angle = - np.pi / 3
 
         # Azimuth angle of ballistic missile
-        azimuth_angle = - np.random.uniform(
+        azimuth_angle = np.random.uniform(
             min_azimuth_angle,
             max_azimuth_angle
         )
@@ -223,7 +223,7 @@ def generate_random_targets(center_drop_position_str, target_dispersion_rate, ti
         initial_position = np.array([
             drop_point[0] - initial_velocity[0] * time_to_impact,
             drop_point[1] - initial_velocity[1] * time_to_impact,
-            (initial_velocity[2] + GRAVITY[2]) * time_to_impact
+            -(initial_velocity[2] + 0.5 * GRAVITY[2] * time_to_impact) * time_to_impact
         ])
 
         target = BallisticMissileTargetModel(current_id, initial_position, initial_velocity)
@@ -333,21 +333,29 @@ def generate_trajectory_points(target, samples, dt, targets_data):
     :param targets_data: target data
     """
     current_time = 0
+    is_landed = False
+    landing_position = None
+    landing_velocity = None
 
     for _ in range(samples):
         # Get current target state
         state = target.get_state(current_time)
+        if not is_landed and state[2][2] < 0:
+            is_landed = True
+            landing_position = np.array([state[2][0], state[2][1], 0])
+            landing_velocity = np.zeros(3)
         targets_data.append({
             'id': state[0],
             'timestep': current_time,
-            'position': state[2].copy(),
-            'velocity': state[3].copy(),
+            'position': landing_position.copy() if is_landed else state[2].copy(),
+            'velocity': landing_velocity.copy() if is_landed else state[3].copy(),
             'target_type': state[4],
             'priority': state[5]
         })
 
         # Update target state
-        target.update_state(dt)
+        if not is_landed:
+            target.update_state(dt)
 
         # Update timestamp
         current_time += dt
