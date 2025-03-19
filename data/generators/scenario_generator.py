@@ -13,6 +13,7 @@ import os
 import numpy as np
 import yaml
 import pandas as pd
+import math
 
 
 from core.models.target_model import (
@@ -164,12 +165,6 @@ def generate_random_targets(center_drop_position_str, target_dispersion_rate, ti
     TOTAL_SAMPLE = 100
     dt = TOTAL_SAMPLE / time_to_impact
 
-    # Sample param data
-    # BASE_SAMPLE_POINTS = 100
-    # ballistic_samples = BASE_SAMPLE_POINTS
-    # cruise_samples = int(BASE_SAMPLE_POINTS * (ballistic_missile_speed / cruise_missile_speed))
-    # aircraft_samples = int(BASE_SAMPLE_POINTS * (ballistic_missile_speed / aircraft_speed))
-
     # Load scenario config
     num_targets = config["num_targets"]
     target_ratio = config["target_ratio"]
@@ -237,14 +232,28 @@ def generate_random_targets(center_drop_position_str, target_dispersion_rate, ti
             0
         ])
 
-        cruise_altitude = 3000
+        cruise_altitude = 8000
+        initial_cruise_altitude = cruise_altitude + np.random.uniform(-100, 100)
         dive_distance_horizontal = 500
-        rocket_acceleration = 5
+        rocket_acceleration_magnitude = 5
+
+        direction_angle = np.array(math.pi/4, 3 * math.pi/4)
 
         delta_x = drop_point[0] - center_drop_position[0]
         delta_y = drop_point[1] - center_drop_position[1]
         direction_2d = np.array([delta_x, delta_y]) / np.sqrt(delta_x ** 2 + delta_y ** 2)
         direction = np.array([direction_2d[0], direction_2d[1], 0])  # 扩展为3D向量，z分量为0
+
+        dive_direction = np.array([
+            direction[0],
+            direction[1],
+            -cruise_altitude / np.sqrt(cruise_altitude ** 2 + dive_distance_horizontal ** 2)
+        ])
+        dive_direction = dive_direction / np.linalg.norm(dive_direction)
+
+        # 将标量加速度转换为向量形式
+        rocket_acceleration = rocket_acceleration_magnitude * dive_direction
+
         cruise_end_point = np.array([
             drop_point[0] - direction[0] * dive_distance_horizontal,
             drop_point[1] - direction[1] * dive_distance_horizontal,
@@ -252,7 +261,7 @@ def generate_random_targets(center_drop_position_str, target_dispersion_rate, ti
         ])
 
         dive_distance = np.sqrt(cruise_altitude**2 + dive_distance_horizontal**2)  # 俯冲阶段运动距离
-        dive_time = np.sqrt(2 * dive_distance / rocket_acceleration)  # 俯冲时间
+        dive_time = np.sqrt(2 * dive_distance / rocket_acceleration_magnitude)  # 俯冲时间
 
         # 计算巡航阶段时间和初始位置
         cruise_time = time_to_impact - dive_time
@@ -262,7 +271,7 @@ def generate_random_targets(center_drop_position_str, target_dispersion_rate, ti
         initial_position = np.array([
             cruise_end_point[0] - direction[0] * cruise_distance,
             cruise_end_point[1] - direction[1] * cruise_distance,
-            cruise_altitude
+            initial_cruise_altitude
         ])
 
         # 初始速度（巡航阶段平均速度）

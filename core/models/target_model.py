@@ -153,13 +153,13 @@ class CruiseMissileTargetModel(TargetModel):
     """
     PRIORITY = 2
     CRUISE_ALTITUDE = 8000
-    TRANSITION_DISTANCE = 500
-    AIR_RESISTANCE_COEF = 0.2
-    DISTURBANCE_SCALE = 0.8
+    TRANSITION_DISTANCE = 500  # Horizontal distance of the subduction section
+    AIR_RESISTANCE_COEF = 0.2  # Coefficient of air resistance
+    DISTURBANCE_SCALE = 0.8  # Disturbance factor
     CRUISE_MISSILE_MASS = 1000
     CRUISE_MISSILE_AREA = 0.3
 
-    def __init__(self, target_id, target_position, velocity_ms, cruise_end_point, dive_time, cruise_time,
+    def __init__(self, target_id, target_position, velocity, cruise_end_point, dive_time, cruise_time,
                  rocket_acceleration):
         """ Initializes the target model.
 
@@ -167,12 +167,12 @@ class CruiseMissileTargetModel(TargetModel):
 
         :param target_id: Target ID
         :param target_position: Target position
-        :param velocity_ms: M/S is the speed in units
+        :param velocity: M/S is the speed in units
         :param cruise_end_point: Cruise end point
         :param dive_time: Dive time
         :param cruise_time: Cruise time
         """
-        super().__init__(target_id, target_position, velocity_ms, "cruise_missile", self.PRIORITY)
+        super().__init__(target_id, target_position, velocity, "cruise_missile", self.PRIORITY)
         self.current_phase = "cruise"
         self.cruise_end_point = np.array(cruise_end_point)
         self.dive_time = dive_time
@@ -199,7 +199,8 @@ class CruiseMissileTargetModel(TargetModel):
         requirements.
         """
         height_error = self.CRUISE_ALTITUDE - self.target_position[2]
-        height_correction = np.array([0, 0, height_error * 0.1])
+        normalized_height_error = np.clip(height_error / 100, -1, 1)
+        height_correction = np.array([0, 0, normalized_height_error * self.DISTURBANCE_SCALE])
 
         horizontal_disturbance = np.random.normal(0, self.DISTURBANCE_SCALE, 2)
         disturbance = np.array([horizontal_disturbance[0], horizontal_disturbance[1], 0])
@@ -235,12 +236,15 @@ class CruiseMissileTargetModel(TargetModel):
 
         if self.current_phase == "cruise":
             control_acceleration = self._apply_cruise_control()
+            self.acceleration = control_acceleration - air_resistance
             if self._check_phase_transition(self.target_position):
                 self.current_phase = "dive"
+                dive_control = self._apply_dive_control()
+                self.acceleration = dive_control - air_resistance
         else:  # dive phase
-            control_acceleration = self._apply_dive_control()
+            dive_control = self._apply_dive_control()
+            self.acceleration = dive_control - air_resistance
 
-        self.acceleration = control_acceleration - air_resistance
         self.velocity += self.acceleration * delta_time
         self.target_position += self.velocity * delta_time
 
