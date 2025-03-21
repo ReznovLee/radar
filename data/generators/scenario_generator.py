@@ -214,11 +214,14 @@ def generate_random_targets(center_drop_position_str, target_dispersion_rate, ti
             ballistic_missile_speed * np.sin(pitch_angle)
         ])
 
+        ballistic_missile_time_to_impact = time_to_impact / 10
+
         # Position initial
         initial_position = np.array([
-            drop_point[0] - initial_velocity[0] * time_to_impact,
-            drop_point[1] - initial_velocity[1] * time_to_impact,
-            -(initial_velocity[2] + 0.5 * GRAVITY[2] * time_to_impact) * time_to_impact
+            drop_point[0] - initial_velocity[0] * ballistic_missile_time_to_impact,
+            drop_point[1] - initial_velocity[1] * ballistic_missile_time_to_impact,
+            (initial_velocity[2] * ballistic_missile_time_to_impact + 0.5 * (-GRAVITY[2])
+             * ballistic_missile_time_to_impact * ballistic_missile_time_to_impact)
         ])
 
         target = BallisticMissileTargetModel(current_id, initial_position, initial_velocity)

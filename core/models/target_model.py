@@ -225,7 +225,7 @@ class CruiseMissileTargetModel(TargetModel):
         horizontal_distance = np.linalg.norm(current_position[:2] - self.cruise_end_point[:2])
         return horizontal_distance <= self.TRANSITION_DISTANCE
 
-    def update_position(self, delta_time):
+    def update_state(self, delta_time):
         """Updates the target position based on the time step.
 
         The position coordinates are updated in a linear manner.
@@ -333,7 +333,7 @@ class AircraftTargetModel(TargetModel):
 
         return direction, disturbance
 
-    def update_position(self, time_step):
+    def update_state(self, time_step):
         """Updates the target position based on the time step.
 
         The position coordinates are updated in a linear manner.

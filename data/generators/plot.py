@@ -96,6 +96,7 @@ def plot_scenario(radar_file: str, target_file: str, save_path: str = None):
 
     # 保存或显示图像
     if save_path:
+        plt.show()
         plt.savefig(save_path, dpi=300, bbox_inches="tight")
         plt.close()
     else:
@@ -104,8 +105,8 @@ def plot_scenario(radar_file: str, target_file: str, save_path: str = None):
 
 if __name__ == "__main__":
     # 示例文件路径（需替换为实际路径）
-    radar_csv = "scenario-2025-02-26/5-radar.csv"
-    target_csv = "scenario-2025-02-26/10-targets_ballistic_missile.csv"
-    save_image = "scenario-2025-02-26/scenario_visualization.png"
+    radar_csv = "scenario-2025-03-21/5-radar.csv"
+    target_csv = "scenario-2025-03-21/10-targets.csv"
+    save_image = "scenario-2025-03-21/scenario_visualization.png"
 
     plot_scenario(radar_csv, target_csv, save_image)
