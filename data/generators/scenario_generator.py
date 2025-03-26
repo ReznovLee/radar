@@ -187,41 +187,32 @@ def generate_random_targets(center_drop_position_str, target_dispersion_rate, ti
             0
         ])
 
-        # Pitch angle range of ballistic missile
-        min_pitch_angle = np.pi / 6  # Minimum pitch angle of a ballistic missile
-        max_pitch_angle = np.pi / 3  # Maximal pitch angle of a ballistic missile
+        alpha = random.uniform(4 * math.pi / 9, math.pi / 3)
+        beta = random.uniform(-math.pi / 3, math.pi / 3)
+        vz = ballistic_missile_speed * np.sin(alpha)
+        v_xy = ballistic_missile_speed * np.cos(alpha)
+        vx = v_xy * math.cos(beta)
+        vy = v_xy * math.sin(beta)
+        ballistic_missile_time_to_impact = time_to_impact / 10
 
-        # Pitch angle of ballistic missile
-        pitch_angle = - np.random.uniform(
-            min_pitch_angle,
-            max_pitch_angle
-        )
+        initial_x = drop_point[0] + vx * ballistic_missile_time_to_impact
+        initial_y = drop_point[1] + vy * ballistic_missile_time_to_impact
+        initial_z = vz * ballistic_missile_time_to_impact + 0.5 * GRAVITY[2] * ballistic_missile_time_to_impact ** 2
 
-        # Azimuth angle range of ballistic missile
-        min_azimuth_angle = - np.pi / 12
-        max_azimuth_angle = - np.pi / 3
-
-        # Azimuth angle of ballistic missile
-        azimuth_angle = np.random.uniform(
-            min_azimuth_angle,
-            max_azimuth_angle
-        )
+        initial_vz = vz + 0.5 * GRAVITY[2] * ballistic_missile_time_to_impact
 
         # Velocity initial
         initial_velocity = np.array([
-            ballistic_missile_speed * np.cos(pitch_angle) * np.cos(azimuth_angle),
-            ballistic_missile_speed * np.cos(pitch_angle) * np.sin(azimuth_angle),
-            ballistic_missile_speed * np.sin(pitch_angle)
+            -vx,
+            -vy,
+            -initial_vz
         ])
-
-        ballistic_missile_time_to_impact = time_to_impact / 10
 
         # Position initial
         initial_position = np.array([
-            drop_point[0] - initial_velocity[0] * ballistic_missile_time_to_impact,
-            drop_point[1] - initial_velocity[1] * ballistic_missile_time_to_impact,
-            (initial_velocity[2] * ballistic_missile_time_to_impact + 0.5 * (-GRAVITY[2])
-             * ballistic_missile_time_to_impact * ballistic_missile_time_to_impact)
+            initial_x,
+            initial_y,
+            initial_z
         ])
 
         target = BallisticMissileTargetModel(current_id, initial_position, initial_velocity)
