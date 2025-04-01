@@ -342,33 +342,59 @@ def generate_trajectory_points(target, samples, dt, targets_data):
     :param dt: time step
     :param targets_data: target data
     """
-    current_time = 0
-    is_landed = False
-    landing_position = None
-    landing_velocity = None
+    current_time = dt  # 当前时间
+    last_state = None  # 记录上一时刻的状态
 
     for _ in range(samples):
-        # Get current target state
-        state = target.get_state(current_time)
-        if not is_landed and state[2][2] < 0:
-            is_landed = True
-            landing_position = np.array([state[2][0], state[2][1], 0])
-            landing_velocity = np.zeros(3)
-        targets_data.append({
-            'id': state[0],
-            'timestep': current_time,
-            'position': landing_position.copy() if is_landed else state[2].copy(),
-            'velocity': landing_velocity.copy() if is_landed else state[3].copy(),
-            'target_type': state[4],
-            'priority': state[5]
-        })
+        state = target.get_state(current_time)  # 获取当前状态
 
-        # Update target state
-        if not is_landed:
-            target.update_state(dt)
+        # Debug 输出
+        print(f"Timestep: {current_time}, Z: {state[2][2]}")
 
-        # Update timestamp
-        current_time += dt
+        # **如果 z 坐标大于0，继续更新状态**
+        if state[2][2] > 0:
+            last_state = state.copy()  # 记录上一时刻的状态
+            targets_data.append({
+                'id': state[0],
+                'timestep': current_time,
+                'position': state[2].copy(),
+                'velocity': state[3].copy(),
+                'target_type': state[4],
+                'priority': state[5]
+            })
+            target.update_state(dt)  # 更新状态
+        else:  # **检测到目标落地（z<=0）**
+            if last_state is not None:
+                # **计算着陆点**
+                x1, y1, z1 = last_state[2]
+                x2, y2, z2 = state[2]
+
+                if abs(z2 - z1) > 1e-6:  # 避免数值误差
+                    t = -z1 / (z2 - z1)  # 计算时间比例
+                    intersection_x = x1 + t * (x2 - x1)
+                    intersection_y = y1 + t * (y2 - y1)
+                else:  # 直接使用上一时刻的位置
+                    intersection_x, intersection_y = x1, y1
+
+                # **修正着陆点**
+                state[2] = [intersection_x, intersection_y, 0]
+            else:
+                # 如果没有上一时刻数据，直接设定着陆点
+                state[2][2] = 0
+
+            # **落地后速度归零**
+            state[3] = [0, 0, 0]
+            targets_data.append({
+                'id': state[0],
+                'timestep': current_time,
+                'position': state[2].copy(),
+                'velocity': state[3].copy(),
+                'target_type': state[4],
+                'priority': state[5]
+            })
+            break
+
+        current_time += 1
 
 
 def save_targets_2_csv(targets_data, target_folder_path, target_file_name):

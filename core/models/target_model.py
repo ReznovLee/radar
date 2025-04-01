@@ -117,9 +117,14 @@ class BallisticMissileTargetModel(TargetModel):
 
         :return: Air resistance acceleration
         """
-        rho = SEA_LEVEL_AIR_DENSITY * math.exp(-self.target_position[2] / ATMOSPHERIC_SCALE_HEIGHT)
-        return (-0.5 * self.AIR_RESISTANCE_COEF * rho * self.velocity * self.velocity * self.BALLISTIC_MISSILE_AREA /
-                self.BALLISTIC_MISSILE_MASS)
+        velocity_magnitude = np.linalg.norm(self.velocity)
+        if velocity_magnitude > 0:
+            rho = SEA_LEVEL_AIR_DENSITY * math.exp(-self.target_position[2] / ATMOSPHERIC_SCALE_HEIGHT)
+            resistance_magnitude = (0.5 * self.AIR_RESISTANCE_COEF * rho * velocity_magnitude * velocity_magnitude
+                                    * self.BALLISTIC_MISSILE_AREA / self.BALLISTIC_MISSILE_MASS)
+            velocity_direction = -self.velocity / velocity_magnitude
+            return resistance_magnitude * velocity_direction
+        return np.zeros(3)
 
     def update_state(self, delta_time):
         """Updates the target position based on the time step.
@@ -129,7 +134,7 @@ class BallisticMissileTargetModel(TargetModel):
         :param delta_time: Time step
         """
         air_resistance = self._calculate_air_resistance_acceleration()
-        self.acceleration = GRAVITY - air_resistance
+        self.acceleration = GRAVITY + air_resistance
 
         self.velocity += self.acceleration * delta_time
         self.target_position += self.velocity * delta_time
