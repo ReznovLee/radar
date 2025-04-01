@@ -333,7 +333,68 @@ def generate_random_targets(center_drop_position_str, target_dispersion_rate, ti
 
 
 def generate_trajectory_points(target, samples, dt, targets_data):
-    """ Generates trajectory points based on target and sample points.
+    """
+    生成目标的轨迹数据，直到目标落地后保持静止。
+
+    参数：
+    - target: 目标对象，具有 update_state(dt) 方法
+    - samples: 采样次数
+    - dt: 初始时间间隔
+    - targets_data: 轨迹数据列表
+    """
+    current_time = 0  # 当前时间
+    last_state = None  # 记录上一时刻的状态
+
+    for _ in range(samples):
+        state = target.get_state(current_time)  # 获取当前状态
+
+        # Debug 输出
+        print(f"Timestep: {current_time}, Z: {state[2][2]}")
+
+        if state[2][2] > 0:  # **z > 0，正常存储**
+            targets_data.append({
+                'id': state[0],
+                'timestep': current_time,
+                'position': state[2].copy(),
+                'velocity': state[3].copy(),
+                'target_type': state[4],
+                'priority': state[5]
+            })
+            last_state = state.copy()  # 记录上一时刻的状态
+            target.update_state(dt)
+        else:  # **z ≤ 0，计算交点**
+            x1, y1, z1 = last_state[2]
+            x2, y2, z2 = state[2]
+
+            if abs(z2 - z1) > 1e-6:  # 避免除零错误
+                t = -z1 / (z2 - z1)  # 计算时间比例
+                intersection_x = x1 + t * (x2 - x1)
+                intersection_y = y1 + t * (y2 - y1)
+            else:  # 直接使用上一时刻的位置
+                intersection_x, intersection_y = x1, y1
+
+            # **修正落地点**
+            fixed_position = [intersection_x, intersection_y, 0]
+            # **落地后速度归零**
+            fixed_velocity = [0, 0, 0]
+            # **记录修正后的落地状态**
+            targets_data.append({
+                'id': state[0],
+                'timestep': current_time,
+                'position': fixed_position,
+                'velocity': fixed_velocity,
+                'target_type': state[4],
+                'priority': state[5]
+            })
+            print(f"Target landed at timestep {current_time}, final position: {fixed_position}")
+            break  # **目标落地后，停止记录**
+
+        current_time += dt
+
+
+"""
+def generate_trajectory_points(target, samples, dt, targets_data):
+     Generates trajectory points based on target and sample points.
 
     Generate the target list as required by the csv file.
 
@@ -341,7 +402,7 @@ def generate_trajectory_points(target, samples, dt, targets_data):
     :param samples: sample points
     :param dt: time step
     :param targets_data: target data
-    """
+    
     current_time = dt  # 当前时间
     last_state = None  # 记录上一时刻的状态
 
@@ -395,6 +456,7 @@ def generate_trajectory_points(target, samples, dt, targets_data):
             break
 
         current_time += 1
+"""
 
 
 def save_targets_2_csv(targets_data, target_folder_path, target_file_name):
