@@ -10,9 +10,17 @@
 
 import os
 import csv
+import sys
+
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib
 from typing import List, Dict
+
+if sys.platform == "win32":
+    matplotlib.use("TkAgg")
+else:
+    matplotlib.use("Agg")
 
 
 # 读取 CSV 文件
@@ -74,7 +82,7 @@ def plot_scenario(radar_file: str, target_file: str, save_path: str = None):
     for radar in radar_data:
         ax.scatter(radar["x"], radar["y"], radar["z"], c='r', marker='^', label=f'Radar {radar["id"]}')
         # 画一个球形表示雷达探测范围
-        u, v = np.mgrid[0:2*np.pi:20j, 0:np.pi:10j]
+        u, v = np.mgrid[0:2 * np.pi:20j, 0:np.pi:10j]
         x = radar["radius"] * np.cos(u) * np.sin(v) + radar["x"]
         y = radar["radius"] * np.sin(u) * np.sin(v) + radar["y"]
         z = radar["radius"] * np.cos(v) + radar["z"]
@@ -105,8 +113,8 @@ def plot_scenario(radar_file: str, target_file: str, save_path: str = None):
 
 if __name__ == "__main__":
     # 示例文件路径（需替换为实际路径）
-    radar_csv = "scenario-2025-04-01/5-radar.csv"
-    target_csv = "scenario-2025-04-01/10-targets.csv"
-    save_image = "scenario-2025-04-01/scenario_visualization.png"
+    radar_csv = "scenario-2025-04-04/5-radar.csv"
+    target_csv = "scenario-2025-04-04/10-targets.csv"
+    save_image = "scenario-2025-04-04/scenario_visualization.png"
 
     plot_scenario(radar_csv, target_csv, save_image)

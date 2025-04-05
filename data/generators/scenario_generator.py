@@ -9,6 +9,7 @@
 """
 import csv
 import random
+import sys
 from datetime import datetime
 import os
 import numpy as np
@@ -33,7 +34,10 @@ def load_config(yaml_file):
     :param yaml_file: path to yaml file, Includes the basic parameters needed to generate the scene.
     """
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    config_path = os.path.join(current_dir, '..\\config', yaml_file)
+    if sys.platform == 'win32':
+        config_path = os.path.join(current_dir, '..\\config', yaml_file)
+    else:
+        config_path = os.path.join(current_dir, '../config', yaml_file)
     with open(config_path, 'r', encoding='UTF-8') as stream:
         config = yaml.safe_load(stream)
     return config
