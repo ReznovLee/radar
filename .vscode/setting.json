@@ -1,5 +1,5 @@
 {
     "python.autoComplete.extraPaths": ["./"],
     "python.analysis.extraPaths": ["./"],
-    "python.testing.pytestArgs": ["--rootdir", "${workspaceFolder}"]
+    "python.testing.pytestArgs": ["--rootdir=${workspaceFolder}"]
   }

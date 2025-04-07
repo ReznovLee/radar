@@ -1,5 +1,6 @@
 # !/usr/bin/env python
 # -*- coding: UTF-8 -*-
+# type: ignore
 """
 @Project: radar
 @File   : scenario_generator.py

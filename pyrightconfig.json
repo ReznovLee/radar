@@ -6,5 +6,8 @@
         {
             "root": "."
         }
-    ]
+    ],
+    "[python]": {
+        "editor.unusualLineTerminators": "off"
+  }
 }
