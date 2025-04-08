@@ -271,15 +271,15 @@ def generate_random_targets(center_drop_position_str, target_dispersion_rate, ti
 
         # 初始位置（从落点反推）
         initial_position = np.array([
-            cruise_end_point[0] - direction[0] * cruise_distance,
-            cruise_end_point[1] - direction[1] * cruise_distance,
+            cruise_end_point[0] - dive_direction[0] * cruise_distance,
+            cruise_end_point[1] - dive_direction[1] * cruise_distance,
             initial_cruise_altitude
         ])
 
         # 初始速度（巡航阶段平均速度）
         initial_velocity = np.array([
-            cruise_missile_speed * direction[0],
-            cruise_missile_speed * direction[1],
+            cruise_missile_speed * dive_direction[0],
+            cruise_missile_speed * dive_direction[1],
             0
         ])
 
