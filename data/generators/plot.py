@@ -10,6 +10,7 @@
 
 import os
 import csv
+import platform
 import sys
 
 import numpy as np
@@ -18,6 +19,8 @@ import matplotlib
 from typing import List, Dict
 
 if sys.platform == "win32":
+    matplotlib.use("TkAgg")
+elif sys.platform == "darwin":
     matplotlib.use("TkAgg")
 else:
     matplotlib.use("Agg")
@@ -113,8 +116,8 @@ def plot_scenario(radar_file: str, target_file: str, save_path: str = None):
 
 if __name__ == "__main__":
     # 示例文件路径（需替换为实际路径）
-    radar_csv = "scenario-2025-04-04/5-radar.csv"
-    target_csv = "scenario-2025-04-04/10-targets.csv"
-    save_image = "scenario-2025-04-04/scenario_visualization.png"
+    radar_csv = "scenario-2025-04-07/5-radar.csv"
+    target_csv = "scenario-2025-04-07/10-targets.csv"
+    save_image = "scenario-2025-04-07/scenario_visualization.png"
 
     plot_scenario(radar_csv, target_csv, save_image)

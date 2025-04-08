@@ -1,6 +1,5 @@
 # !/usr/bin/env python
 # -*- coding: UTF-8 -*-
-# type: ignore
 """
 @Project: radar
 @File   : scenario_generator.py
@@ -18,6 +17,7 @@ import yaml
 import pandas as pd
 import math
 
+
 from core.models.target_model import (
     BallisticMissileTargetModel,
     CruiseMissileTargetModel,
@@ -29,7 +29,7 @@ from core.models.target_model import (
 def load_config(yaml_file):
     """ Load configuration from yaml file
 
-    The basic parameter information of the scene is in "./data/config/param_config.yaml ", including the number of
+    The basic parameter information of the scene is in "./data/config/param_config.yaml", including the number of
     targets/radars, the proportion of target types, simulation parameters and output file information.
 
     :param yaml_file: path to yaml file, Includes the basic parameters needed to generate the scene.
@@ -348,40 +348,64 @@ def generate_trajectory_points(target, samples, dt, targets_data):
     - targets_data: 轨迹数据列表
     """
     current_time = 0  # 当前时间
-    last_state = None  # 记录上一时刻的状态
+
+    last_position = None  # 记录上一时刻的位置
+
+    # last_state = None  # 记录上一时刻的状态
 
     for _ in range(samples):
         state = target.get_state(current_time)  # 获取当前状态
+        current_position = np.array(state[2], dtype=np.float64)
+        current_velocity = np.array(state[3], dtype=np.float64)
 
         # Debug 输出
         print(f"Timestep: {current_time}, Z: {state[2][2]}")
 
-        if state[2][2] > 0:  # **z > 0，正常存储**
+        # if state[2][2] > 0:  # **z > 0，正常存储**
+        if current_position[2] > 0:  # **z > 0，正常存储**
             targets_data.append({
                 'id': state[0],
                 'timestep': current_time,
-                'position': state[2].copy(),
-                'velocity': state[3].copy(),
+                'position': current_position.copy(),
+                'velocity': current_velocity.copy(),
                 'target_type': state[4],
                 'priority': state[5]
             })
-            last_state = state.copy()  # 记录上一时刻的状态
+            # last_state = state.copy()  # 记录上一时刻的状态
+            last_position = current_position.copy()  # 记录上一时刻的位置
             target.update_state(dt)
+            current_time += dt
         else:  # **z ≤ 0，计算交点**
-            x1, y1, z1 = last_state[2]
-            x2, y2, z2 = state[2]
+            if last_position is None:
+                print("警告：没有上一时刻的状态，无法计算精确落地点")
+                # **修正落地点**
+                fixed_position = [current_position[0], current_position[1], 0]
+                # **落地后速度归零**
+                fixed_velocity = [0, 0, 0]
+                # **落地后速度归零**
+            else:
+                x1, y1, z1 = last_position
+                x2, y2, z2 = current_position
 
-            if abs(z2 - z1) > 1e-6:  # 避免除零错误
-                t = -z1 / (z2 - z1)  # 计算时间比例
-                intersection_x = x1 + t * (x2 - x1)
-                intersection_y = y1 + t * (y2 - y1)
-            else:  # 直接使用上一时刻的位置
-                intersection_x, intersection_y = x1, y1
+                if abs(z2 - z1) > 1e-6:  # 避免除零错误
+                    # 计算线段与平面交点的参数t
+                    t = -z1 / (z2 - z1)  # 计算时间比例
+                    # 使用线性插值计算交点的x和y坐标
+                    intersection_x = x1 + t * (x2 - x1)
+                    intersection_y = y1 + t * (y2 - y1)
+                    # 计算落地时刻（在当前时间步内的精确时刻）
+                    landing_time = current_time - dt + t * dt
+                else:
+                    # 如果z方向变化很小，直接使用上一时刻的位置
+                    intersection_x, intersection_y = x1, y1
+                    landing_time = current_time - dt
 
-            # **修正落地点**
-            fixed_position = [intersection_x, intersection_y, 0]
-            # **落地后速度归零**
-            fixed_velocity = [0, 0, 0]
+                # 修正落地点
+                fixed_position = [intersection_x, intersection_y, 0]
+                # 落地后速度归零
+                fixed_velocity = [0, 0, 0]
+                # 使用精确地落地时刻
+                current_time = landing_time
             # **记录修正后的落地状态**
             targets_data.append({
                 'id': state[0],
