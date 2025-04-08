@@ -336,8 +336,58 @@ def generate_random_targets(center_drop_position_str, target_dispersion_rate, ti
     targets_data.sort(key=lambda x: (x['id'], x['timestep']))
     return targets_data
 
-
 def generate_trajectory_points(target, samples, dt, targets_data):
+    """ Function that generates trajectory points for targets.
+
+    This function is used to generate trajectory data points. 
+    For the specific data format, refer to the TargetModel class. 
+    The way to generate data is mainly to advance the simulation time and obtain the target state 
+    with different timestamps from the TargetModel class. The target object is used to access 
+    class-related methods. samples indicates the number of samples, which is synchronized with 
+    the situation update frequency. dt indicates the update time interval. target_data indicates 
+    the temporarily stored target trajectory point data.
+
+    :param target: target object initialized from core.models.target_model
+    :param samples: samples that need sampling from time step
+    :param dt: time step
+    :param targets_data: list of target data
+    """
+    current_time = 0
+    last_position = None
+
+    for _ in range(samples):
+        state = target.get_state(current_time)
+        current_position = np.array(state[2], dtype=np.float64)
+        if current_position[2] > 0:
+            targets_data.append({
+                'id': state[0],
+                'timestep': current_time,
+                'position': current_position.copy(),
+                'velocity': np.array(state[3], dtype=np.float64).copy(),
+                'target_type': state[4],
+                'priority': state[5]
+            })
+            target.update_state(dt)
+            last_position = current_position.copy()
+            current_time += dt
+        else:
+            xp, yp, zp = last_position
+            xc, yc, zc = current_position
+            t = - zp / (zc - zp)
+            cross_x = xp + t * (xc - xp)
+            cross_y = yp + t * (yc - yp)
+            landing_position = [cross_x, cross_y, 0]
+            targets_data.append({
+                'id': state[0],
+                'timestep': current_time,
+                'position': landing_position.copy(),
+                'velocity': np.zeros(3),
+                'target_type': state[4],
+                'priority': state[5]
+            })
+            break
+
+def generate_trajectory_points1(target, samples, dt, targets_data):
     """
     生成目标的轨迹数据，直到目标落地后保持静止。
 
