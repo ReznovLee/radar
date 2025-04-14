@@ -70,7 +70,7 @@ class Radar:
         for channel_id in range(self.num_channels):
             if self.radar_channels[channel_id] is None:
                 self.radar_channels[channel_id] = target_id
-                print(f"Radar {self.radar_id} assign channel {channel_id} to {self.radar_channels[channel_id]}")
+                print(f"Radar {self.radar_id} assign channel {channel_id} to target {target_id} \n")
                 return channel_id
         return None
 
@@ -84,15 +84,15 @@ class Radar:
         :return: Whether to release the channel -> bool
         """
         if channel_id not in self.radar_channels:
-            logging.error(f"The channel ID {channel_id} does not exist")
+            logging.error(f"The channel ID {channel_id} does not exist. \n")
             return False
 
         if self.radar_channels[channel_id] is not None:
             self.radar_channels[channel_id] = None
-            print(f"Radar {self.radar_id} released channel {channel_id}")
+            print(f"Radar {self.radar_id} released channel {channel_id}. \n")
             return True
         else:
-            print(f"The channel {channel_id} of the radar {self.radar_id} is already idle")
+            print(f"The channel {channel_id} of the radar {self.radar_id} is already idle. \n")
             return False
 
     def is_target_in_range(self, target_position):
@@ -139,7 +139,7 @@ class RadarNetwork:
         covering_radars = []
         for radar in self.radars:
             if radar.is_target_in_range(target_position):
-                #  covering_radars.append(radar.radar_id)
+                #  covering_radars.append(radar)
                 covering_radars.append(radar)
 
         covering_radars.sort(
@@ -179,6 +179,7 @@ class RadarNetwork:
         """
         if radar_id in self.radars:
             self.radars[radar_id].release_channel(channel_id)
+            print(f"The channel {channel_id} of radar {radar_id} has been released. \n")
         else:
             logging.error(f"Error: Trying to free a channel {channel_id} for a nonexistent radar {radar_id}")
 
