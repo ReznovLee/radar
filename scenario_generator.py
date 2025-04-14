@@ -262,7 +262,7 @@ def generate_random_targets(center_drop_position_str, target_dispersion_rate, ti
         rocket_acceleration = rocket_acceleration_magnitude * dive_direction_array
 
         # 计算巡航阶段时间和初始位置
-        cruise_distance = (cruise_missile_speed * cruise_time + 0.5 * rocket_acceleration_magnitude * cruise_time ** 2)
+        cruise_distance = (cruise_missile_speed * cruise_time)
 
         # 初始位置（从落点反推）
         initial_position = np.array([
@@ -273,8 +273,8 @@ def generate_random_targets(center_drop_position_str, target_dispersion_rate, ti
 
         # 初始速度（巡航阶段平均速度）
         initial_velocity = np.array([
-            cruise_missile_speed * dive_direction[0],
-            cruise_missile_speed * dive_direction[1],
+            -cruise_missile_speed * dive_direction[0],
+            -cruise_missile_speed * dive_direction[1],
             0
         ])
 

@@ -199,10 +199,19 @@ class CruiseMissileTargetModel(TargetModel):
         return height_correction + disturbance
         """
         height_error = self.CRUISE_ALTITUDE - self.target_position[2]  # Height error calculation
-        normalized_height_error = np.clip(height_error / 50, -1, 1)  # Normalized height error, reducing the denominator has increased the response to the error
-        time_based_oscillation = np.sin(self.cruise_time * 0.1) * 0.3  # Adding sinusoidal oscillations in the height direction
-        height_correction = np.array([0, 0, (normalized_height_error + time_based_oscillation) * self.DISTURBANCE_SCALE])  # Composite altitude correction
-        horizontal_disturbance = np.random.normal(0, self.DISTURBANCE_SCALE * 0.7, 2)  # Adding random horizontal disturbances
+
+        # Normalized height error, reducing the denominator has increased the response to the error
+        normalized_height_error = np.clip(height_error / 50, -1, 1)
+
+        # Adding sinusoidal oscillations in the height direction
+        time_based_oscillation = np.sin(self.cruise_time * 0.1) * 0.3
+
+        # Composite altitude correction
+        height_correction = np.array([0, 0, (normalized_height_error + time_based_oscillation) *
+                                      self.DISTURBANCE_SCALE])
+
+        # Adding random horizontal disturbances
+        horizontal_disturbance = np.random.normal(0, self.DISTURBANCE_SCALE * 0.7, 2)
         disturbance = np.array([horizontal_disturbance[0], horizontal_disturbance[1], 0]) 
         return height_correction + disturbance
 
@@ -222,7 +231,7 @@ class CruiseMissileTargetModel(TargetModel):
         :return: True if missile should transition, False otherwise
         """
         horizontal_distance = np.linalg.norm(current_position[:2] - self.cruise_end_point[:2])
-        return horizontal_distance <= self.TRANSITION_DISTANCE
+        return (horizontal_distance <= self.TRANSITION_DISTANCE) or (self.cruise_time <= 0)
 
     def update_state(self, delta_time):
         """Updates the target position based on the time step.
@@ -231,7 +240,11 @@ class CruiseMissileTargetModel(TargetModel):
 
         :param delta_time: Time step
         """
+        self.cruise_time -= delta_time
+
         if self.current_phase == "cruise":
+            cruise_control = self._apply_cruise_control()
+            self.acceleration = cruise_control
             if self._check_phase_transition(self.target_position):
                 self.current_phase = "dive"
                 dive_control = self._apply_dive_control()

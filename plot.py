@@ -8,9 +8,7 @@
 @Date    ：2025/2/5 15:30
 """
 
-import os
 import csv
-import platform
 import sys
 
 import numpy as np
