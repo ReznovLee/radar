@@ -8,7 +8,6 @@
 @Date   : 2025/02/15 14:25
 """
 import math
-
 import numpy as np
 
 GRAVITY = np.array([0, 0, -9.81])
@@ -159,10 +158,7 @@ class CruiseMissileTargetModel(TargetModel):
     PRIORITY = 2
     CRUISE_ALTITUDE = 8000
     TRANSITION_DISTANCE = 500  # Horizontal distance of the subduction section
-    AIR_RESISTANCE_COEF = 0.2  # Coefficient of air resistance
     DISTURBANCE_SCALE = 0.8  # Disturbance factor
-    CRUISE_MISSILE_MASS = 1000
-    CRUISE_MISSILE_AREA = 0.3
 
     def __init__(self, target_id, target_position, velocity, cruise_end_point, dive_time, cruise_time,
                  rocket_acceleration):
@@ -176,6 +172,7 @@ class CruiseMissileTargetModel(TargetModel):
         :param cruise_end_point: Cruise end point
         :param dive_time: Dive time
         :param cruise_time: Cruise time
+        :param rocket_acceleration: Rocket acceleration in dive phase
         """
         super().__init__(target_id, target_position, velocity, "cruise_missile", self.PRIORITY)
         self.current_phase = "cruise"
@@ -185,23 +182,12 @@ class CruiseMissileTargetModel(TargetModel):
         self.rocket_acceleration = rocket_acceleration
         self.acceleration = np.zeros(3)
 
-    def _calculate_air_resistance_acceleration(self):
-        """Calculates the air resistance acceleration of the missile.
-
-        The acceleration of air resistance is approximately calculated by the classical formula of air resistance,
-        and the formula of air density is obtained by ISA empirical formula.
-
-        :return: Air resistance acceleration
-        """
-        rho = SEA_LEVEL_AIR_DENSITY * math.exp(-self.target_position[2] / ATMOSPHERIC_SCALE_HEIGHT)
-        return (-0.5 * self.AIR_RESISTANCE_COEF * rho * self.velocity * self.velocity * self.CRUISE_MISSILE_AREA /
-                self.CRUISE_MISSILE_MASS)
-
     def _apply_cruise_control(self):
         """ Apply cruise control to the cruise phase.
 
         Cruise missile needs to add disturbance in both cruise and reentry phase to meet the actual operational
         requirements.
+        """
         """
         height_error = self.CRUISE_ALTITUDE - self.target_position[2]
         normalized_height_error = np.clip(height_error / 100, -1, 1)
@@ -210,6 +196,14 @@ class CruiseMissileTargetModel(TargetModel):
         horizontal_disturbance = np.random.normal(0, self.DISTURBANCE_SCALE, 2)
         disturbance = np.array([horizontal_disturbance[0], horizontal_disturbance[1], 0])
 
+        return height_correction + disturbance
+        """
+        height_error = self.CRUISE_ALTITUDE - self.target_position[2]  # Height error calculation
+        normalized_height_error = np.clip(height_error / 50, -1, 1)  # Normalized height error, reducing the denominator has increased the response to the error
+        time_based_oscillation = np.sin(self.cruise_time * 0.1) * 0.3  # Adding sinusoidal oscillations in the height direction
+        height_correction = np.array([0, 0, (normalized_height_error + time_based_oscillation) * self.DISTURBANCE_SCALE])  # Composite altitude correction
+        horizontal_disturbance = np.random.normal(0, self.DISTURBANCE_SCALE * 0.7, 2)  # Adding random horizontal disturbances
+        disturbance = np.array([horizontal_disturbance[0], horizontal_disturbance[1], 0]) 
         return height_correction + disturbance
 
     def _apply_dive_control(self):
@@ -237,18 +231,14 @@ class CruiseMissileTargetModel(TargetModel):
 
         :param delta_time: Time step
         """
-        air_resistance = self._calculate_air_resistance_acceleration()
-
         if self.current_phase == "cruise":
-            control_acceleration = self._apply_cruise_control()
-            self.acceleration = control_acceleration - air_resistance
             if self._check_phase_transition(self.target_position):
                 self.current_phase = "dive"
                 dive_control = self._apply_dive_control()
-                self.acceleration = dive_control - air_resistance
+                self.acceleration = dive_control
         else:  # dive phase
             dive_control = self._apply_dive_control()
-            self.acceleration = dive_control - air_resistance
+            self.acceleration = dive_control
 
         self.velocity += self.acceleration * delta_time
         self.target_position += self.velocity * delta_time
