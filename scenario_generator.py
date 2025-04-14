@@ -17,7 +17,7 @@ import yaml
 import pandas as pd
 import math
 
-from core.models.target_model import (
+from src.core.models.target_model import (
     BallisticMissileTargetModel,
     CruiseMissileTargetModel,
     AircraftTargetModel,
@@ -35,9 +35,9 @@ def load_config(yaml_file):
     """
     current_dir = os.path.dirname(os.path.abspath(__file__))
     if sys.platform == 'win32':
-        config_path = os.path.join(current_dir, '..\\config', yaml_file)
+        config_path = os.path.join(current_dir, 'src\data\config', yaml_file)
     else:
-        config_path = os.path.join(current_dir, '../config', yaml_file)
+        config_path = os.path.join(current_dir, 'src/data/config', yaml_file)
     with open(config_path, 'r', encoding='UTF-8') as stream:
         config = yaml.safe_load(stream)
     return config
@@ -586,7 +586,7 @@ def generate_scenario():
 
     # 创建输出文件夹
     current_date = datetime.now().strftime('%Y-%m-%d')
-    output_folder_path = f"scenario-{current_date}"
+    output_folder_path = f"output/scenario-{current_date}"
 
     # 生成并保存雷达数据
     radars = generate_radars()
