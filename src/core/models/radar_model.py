@@ -139,14 +139,16 @@ class RadarNetwork:
         covering_radars = []
         for radar in self.radars:
             if radar.is_target_in_range(target_position):
-                covering_radars.append(radar.radar_id)
+                #  covering_radars.append(radar.radar_id)
+                covering_radars.append(radar)
 
         covering_radars.sort(
-            key=lambda r: sum(1 for c in r.channels.values() if c in None),
+            key=lambda r: sum(1 for c in r.radar_channels.values() if c is None),
             reverse=True
         )
+        radar_ids = [radar.radar_id for radar in covering_radars]
         logging.debug(f"Find {len(covering_radars)} radar coverage target position {target_position}")
-        return covering_radars
+        return radar_ids
 
     def assign_radar(self, target_id, target_position):
         """The radar is assigned to the target
@@ -157,11 +159,13 @@ class RadarNetwork:
         :param target_position: The 3D coordinates of the target
         :return: Radar ID list -> list
         """
-        covering_radars = self.find_covering_radars(target_position)
-        for radar in covering_radars:
-            channel_id = radar.assign_channel(target_id)
-            if channel_id is not None:
-                return radar.radar_id, channel_id
+        covering_radars_ids = self.find_covering_radars(target_position)
+        for radar_id in covering_radars_ids:
+            radar = next((r for r in self.radars if r.radar_id == radar_id), None)
+            if radar:
+                channel_id = radar.assign_channel(target_id)
+                if channel_id is not None:
+                    return radar.radar_id, channel_id
         logging.warning(f"Target {target_id} has no radar channel available at position {target_position}")
         return None
 
