@@ -157,8 +157,8 @@ class CruiseMissileTargetModel(TargetModel):
     """
     PRIORITY = 2
     CRUISE_ALTITUDE = 8000
-    TRANSITION_DISTANCE = 500  # Horizontal distance of the subduction section
-    DISTURBANCE_SCALE = 0.8  # Disturbance factor
+    TRANSITION_DISTANCE = 3000  # Horizontal distance of the subduction section
+    DISTURBANCE_SCALE = 0.5  # Disturbance factor
 
     def __init__(self, target_id, target_position, velocity, cruise_end_point, dive_time, cruise_time,
                  rocket_acceleration):
@@ -201,7 +201,7 @@ class CruiseMissileTargetModel(TargetModel):
         height_error = self.CRUISE_ALTITUDE - self.target_position[2]  # Height error calculation
 
         # Normalized height error, reducing the denominator has increased the response to the error
-        normalized_height_error = np.clip(height_error / 50, -1, 1)
+        normalized_height_error = np.clip(height_error / 10, -1, 1)
 
         # Adding sinusoidal oscillations in the height direction
         time_based_oscillation = np.sin(self.cruise_time * 0.1) * 0.3
@@ -274,6 +274,8 @@ class AircraftTargetModel(TargetModel):
     AIR_RESISTANCE_COEF = 0.1
     TURN_RATE_MAX = 0.1
     VERTICAL_ACCELERATION = 5
+    SPEED_CONTROL_FACTOR = 0.5  # 增大速度控制因子
+    MAX_ACCELERATION = 10  # 添加最大加速度限制
 
     def __init__(self, target_id, target_position, velocity_ms):
         """ Initializes the aircraft target model.
@@ -290,6 +292,20 @@ class AircraftTargetModel(TargetModel):
         self.acceleration = np.zeros(3)
         self.yaw = np.random.uniform(0, 2 * np.pi)
         self.pitch = np.random.uniform(-np.pi / 6, np.pi / 6)
+        self.target_speed = np.linalg.norm(velocity_ms)
+
+    def _apply_speed_control(self):
+        """Apply speed control to maintain target speed"""
+        current_speed = np.linalg.norm(self.velocity)
+        if current_speed > 0:
+            speed_diff = self.target_speed - current_speed
+            acceleration = self.velocity * (speed_diff * self.SPEED_CONTROL_FACTOR / current_speed)
+            # 限制加速度大小
+            acc_magnitude = np.linalg.norm(acceleration)
+            if acc_magnitude > self.MAX_ACCELERATION:
+                acceleration = acceleration * (self.MAX_ACCELERATION / acc_magnitude)
+            return acceleration
+        return np.zeros(3)
 
     def _calculate_air_resistance(self):
         """ Calculate air resistance.
@@ -352,8 +368,24 @@ class AircraftTargetModel(TargetModel):
         direction, disturbance = self._apply_maneuver(time_step)
         altitude_control = self._apply_altitude_control()
 
-        speed = np.linalg.norm(self.velocity)
+        speed_control = self._apply_speed_control()
 
+        total_acceleration = (air_resistance +
+                              altitude_control +
+                              disturbance / time_step +
+                              speed_control)
+
+        acc_magnitude = np.linalg.norm(total_acceleration)
+        if acc_magnitude > self.MAX_ACCELERATION:
+            total_acceleration = total_acceleration * (self.MAX_ACCELERATION / acc_magnitude)
+
+        self.acceleration = np.nan_to_num(total_acceleration, nan=0.0, posinf=0.0, neginf=0.0)
+
+        # 更新速度和位置
+        self.velocity += self.acceleration * time_step
+        self.target_position += self.velocity * time_step
+
+        """
         # 分别处理每个加速度分量，避免直接相加
         if speed > 0 and time_step > 0:
             desired_velocity = direction * speed
@@ -381,3 +413,4 @@ class AircraftTargetModel(TargetModel):
         # 更新速度和位置
         self.velocity += self.acceleration * time_step
         self.target_position += self.velocity * time_step
+        """

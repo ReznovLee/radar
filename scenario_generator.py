@@ -166,7 +166,7 @@ def generate_random_targets(center_drop_position_str, target_dispersion_rate, ti
     aircraft_speed = config["speed"]["aircraft_speed"]
 
     # Sample param date
-    TOTAL_SAMPLE = 100
+    TOTAL_SAMPLE = 1000
     dt = TOTAL_SAMPLE / time_to_impact
 
     # Load scenario config
@@ -197,7 +197,7 @@ def generate_random_targets(center_drop_position_str, target_dispersion_rate, ti
         v_xy = ballistic_missile_speed * np.cos(alpha)
         vx = v_xy * math.cos(beta)
         vy = v_xy * math.sin(beta)
-        ballistic_missile_time_to_impact = time_to_impact / 10  # TODO: Debug param, when finish the code, delete the 10
+        ballistic_missile_time_to_impact = time_to_impact / 10  # TODO: Debug param, when finish the code, delete it
 
         initial_x = drop_point[0] + vx * ballistic_missile_time_to_impact
         initial_y = drop_point[1] + vy * ballistic_missile_time_to_impact
@@ -240,43 +240,53 @@ def generate_random_targets(center_drop_position_str, target_dispersion_rate, ti
         rocket_acceleration_magnitude = 5
 
         theta = random.uniform(math.pi / 4, 3 * math.pi / 4)
-        dx = dive_distance_horizontal * math.cos(theta)
-        dy = dive_distance_horizontal * math.sin(theta)
-        cruise_end_point = np.array([dx, dy, initial_cruise_altitude])
+        cruise_end_point = np.array([
+            drop_point[0] - dive_distance_horizontal * math.cos(theta),
+            drop_point[1] - dive_distance_horizontal * math.sin(theta),
+            initial_cruise_altitude
+        ])
 
+        """
         delta_x = cruise_end_point[0] - drop_point[0]
         delta_y = cruise_end_point[1] - drop_point[1]
         delta_z = cruise_end_point[2]
         dive_direction = np.array([delta_x, delta_y, delta_z]) / np.sqrt(delta_x ** 2 + delta_y ** 2 + delta_z ** 2)
         dive_direction_array = np.array([dive_direction[0], dive_direction[1], dive_direction[2]])
+        """
+
+        delta_x = drop_point[0] - cruise_end_point[0]
+        delta_y = drop_point[1] - cruise_end_point[1]
+        delta_z = -cruise_end_point[2]  # 从巡航高度到地面
+        dive_direction = np.array([delta_x, delta_y, delta_z])
+        dive_direction = dive_direction / np.linalg.norm(dive_direction)
 
         dive_distance = np.sqrt(dive_distance_horizontal ** 2 + initial_cruise_altitude ** 2)
         dive_time = dive_distance / cruise_missile_speed
+        cruise_time = time_to_impact - dive_time
 
         if dive_time <= time_to_impact:
-            cruise_time = time_to_impact - dive_time
+            if dive_time < time_to_impact * 0.3:
+                dive_time = time_to_impact * 0.3
+                cruise_time = time_to_impact * 0.7
         else:
             raise ValueError("dive_time must be smaller than time_to_impact")
 
-        # 将标量加速度转换为向量形式
-        rocket_acceleration = rocket_acceleration_magnitude * dive_direction_array
+        cruise_direction = np.array([-dive_direction[0], -dive_direction[1], 0])
+        cruise_direction = cruise_direction / np.linalg.norm(cruise_direction)
 
-        # 计算巡航阶段时间和初始位置
-        cruise_distance = (cruise_missile_speed * cruise_time)
+        cruise_distance = cruise_missile_speed * cruise_time * 0.9
 
-        # 初始位置（从落点反推）
         initial_position = np.array([
-            cruise_end_point[0] + dive_direction[0] * cruise_distance,
-            cruise_end_point[1] + dive_direction[1] * cruise_distance,
+            cruise_end_point[0] - cruise_direction[0] * cruise_distance,
+            cruise_end_point[1] - cruise_direction[1] * cruise_distance,
             initial_cruise_altitude
         ])
 
+        # 将标量加速度转换为向量形式
+        rocket_acceleration = rocket_acceleration_magnitude * dive_direction
+
         # 初始速度（巡航阶段平均速度）
-        initial_velocity = np.array([
-            -cruise_missile_speed * dive_direction[0],
-            -cruise_missile_speed * dive_direction[1],
-            0
-        ])
+        initial_velocity = cruise_missile_speed * cruise_direction
 
         # 创建目标并生成轨迹
         target = CruiseMissileTargetModel(
@@ -293,6 +303,7 @@ def generate_random_targets(center_drop_position_str, target_dispersion_rate, ti
         current_id += 1
 
     for _ in range(aircraft_counts):
+        """
         target_end_point = np.array([
             center_drop_position[0] + np.random.uniform(-target_distribution_range, target_distribution_range),
             center_drop_position[1] + np.random.uniform(-target_distribution_range, target_distribution_range),
@@ -322,6 +333,44 @@ def generate_random_targets(center_drop_position_str, target_dispersion_rate, ti
             initial_velocity
         )
         generate_trajectory_points(target, TOTAL_SAMPLE, dt, targets_data)
+        current_id += 1
+        """
+        theta = random.uniform(math.pi / 4, 3 * math.pi / 4)
+        r = 50000  # 设置合理的初始距离
+
+        # 计算初始位置
+        initial_position = np.array([
+            center_drop_position[0] + r * math.cos(theta),
+            center_drop_position[1] + r * math.sin(theta),
+            random.uniform(AircraftTargetModel.MIN_ALTITUDE, AircraftTargetModel.MAX_ALTITUDE)
+        ])
+
+        # 计算终点位置（镜像）
+        end_position = np.array([
+            center_drop_position[0] - (initial_position[0] - center_drop_position[0]),
+            center_drop_position[1] - (initial_position[1] - center_drop_position[1]),
+            random.uniform(AircraftTargetModel.MIN_ALTITUDE, AircraftTargetModel.MAX_ALTITUDE)
+        ])
+
+        # 计算初始速度方向
+        direction = end_position - initial_position
+        direction_xy = direction[:2] / np.linalg.norm(direction[:2])
+
+        # 确保初始速度大小合理
+        # initial_speed = min(aircraft_speed, 300)  # 限制最大初始速度
+        initial_speed = aircraft_speed
+        initial_velocity = np.array([
+            initial_speed * direction_xy[0],
+            initial_speed * direction_xy[1],
+            0
+        ])
+
+        target = AircraftTargetModel(
+            current_id,
+            initial_position,
+            initial_velocity
+        )
+        generate_aircraft_trajectory_points(target, TOTAL_SAMPLE, dt, targets_data)
         current_id += 1
 
     targets_data.sort(key=lambda x: (x['id'], x['timestep']))
@@ -379,6 +428,54 @@ def generate_trajectory_points(target, samples, dt, targets_data):
             })
             break
 
+def generate_aircraft_trajectory_points(target, samples, dt, targets_data):
+    """ Function that generates trajectory points for aircraft.
+
+    This function is specifically designed for aircraft trajectory generation. Unlike missiles,
+    aircraft maintain their flight within a specified altitude range and don't need landing calculations.
+
+    :param target: aircraft target object initialized from AircraftTargetModel
+    :param samples: number of samples needed
+    :param dt: time step
+    :param targets_data: list to store trajectory data
+    """
+    current_time = 0
+
+    for _ in range(samples):
+        state = target.get_state(current_time)
+        current_position = np.array(state[2], dtype=np.float64)
+        
+        # 确保飞机在合理高度范围内
+        if (current_position[2] >= target.MIN_ALTITUDE - 100 and 
+            current_position[2] <= target.MAX_ALTITUDE + 100):
+            targets_data.append({
+                'id': state[0],
+                'timestep': current_time,
+                'position': current_position.copy(),
+                'velocity': np.array(state[3], dtype=np.float64).copy(),
+                'target_type': state[4],
+                'priority': state[5]
+            })
+            target.update_state(dt)
+            current_time += dt
+        else:
+            # 如果超出高度范围，调整高度到允许范围内
+            adjusted_position = current_position.copy()
+            if current_position[2] < target.MIN_ALTITUDE:
+                adjusted_position[2] = target.MIN_ALTITUDE
+            elif current_position[2] > target.MAX_ALTITUDE:
+                adjusted_position[2] = target.MAX_ALTITUDE
+                
+            targets_data.append({
+                'id': state[0],
+                'timestep': current_time,
+                'position': adjusted_position,
+                'velocity': np.array(state[3], dtype=np.float64).copy(),
+                'target_type': state[4],
+                'priority': state[5]
+            })
+            target.update_state(dt)
+            current_time += dt
 
 def generate_trajectory_points1(target, samples, dt, targets_data):
     """
@@ -522,7 +619,7 @@ def generate_scenario():
     save_radars_2_csv(radars, output_folder_path, radar_file_name)
 
     # 生成并保存目标数据
-    targets = generate_random_targets(target_drop_position, target_aggregation_rate, time_to_impact=100)
+    targets = generate_random_targets(target_drop_position, target_aggregation_rate, time_to_impact=1000)
     target_file_name = config["output"]["target_filename_template"].format(num_targets=num_targets)
     save_targets_2_csv(targets, output_folder_path, target_file_name)
 
