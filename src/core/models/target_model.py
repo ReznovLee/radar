@@ -276,6 +276,8 @@ class AircraftTargetModel(TargetModel):
     VERTICAL_ACCELERATION = 5
     SPEED_CONTROL_FACTOR = 0.5  # 增大速度控制因子
     MAX_ACCELERATION = 10  # 添加最大加速度限制
+    DIRECTION_STABILITY = 0.95  # 方向稳定性因子
+    MANEUVER_INTERVAL = 10.0  # 大幅度机动的时间间隔
 
     def __init__(self, target_id, target_position, velocity_ms):
         """ Initializes the aircraft target model.
@@ -293,6 +295,8 @@ class AircraftTargetModel(TargetModel):
         self.yaw = np.random.uniform(0, 2 * np.pi)
         self.pitch = np.random.uniform(-np.pi / 6, np.pi / 6)
         self.target_speed = np.linalg.norm(velocity_ms)
+        self.target_direction = self._calculate_direction_from_velocity(velocity_ms)
+        self.time_since_last_maneuver = 0.0
 
     def _apply_speed_control(self):
         """Apply speed control to maintain target speed"""
@@ -320,6 +324,13 @@ class AircraftTargetModel(TargetModel):
             return resistance
         return np.zeros(3)
 
+    def _calculate_direction_from_velocity(self, velocity):
+        """计算速度向量对应的方向"""
+        velocity_magnitude = np.linalg.norm(velocity)
+        if velocity_magnitude > 0:
+            return velocity / velocity_magnitude
+        return np.array([1.0, 0.0, 0.0])  # 默认方向
+
     def _apply_altitude_control(self):
         """ Apply altitude control to the aircraft target.
 
@@ -340,22 +351,44 @@ class AircraftTargetModel(TargetModel):
         :param time_step: Time step
         :return: Maneuver acceleration
         """
-        self.yaw += np.random.uniform(-self.TURN_RATE_MAX, self.TURN_RATE_MAX)
-        self.pitch += np.random.uniform(-self.TURN_RATE_MAX / 2, self.TURN_RATE_MAX / 2)
+        # 更新机动计时器
+        self.time_since_last_maneuver += time_step
 
-        direction = np.array([
+        # 决定是否进行大幅度机动
+        if self.time_since_last_maneuver >= self.MANEUVER_INTERVAL:
+            # 大幅度机动
+            yaw_change = np.random.uniform(-self.TURN_RATE_MAX, self.TURN_RATE_MAX)
+            pitch_change = np.random.uniform(-self.TURN_RATE_MAX / 2, self.TURN_RATE_MAX / 2)
+            self.time_since_last_maneuver = 0.0  # 重置计时器
+        else:
+            # 小幅度调整
+            yaw_change = np.random.uniform(-self.TURN_RATE_MAX/5, self.TURN_RATE_MAX/5)
+            pitch_change = np.random.uniform(-self.TURN_RATE_MAX/10, self.TURN_RATE_MAX/10)
+
+        # 更新航向和俯仰角
+        self.yaw += yaw_change
+        self.pitch += np.clip(self.pitch + pitch_change, -np.pi/4, np.pi/4)  # 限制俯仰角范围
+
+        # 计算新方向
+        new_direction = np.array([
             np.cos(self.pitch) * np.cos(self.yaw),
             np.cos(self.pitch) * np.sin(self.yaw),
             np.sin(self.pitch)
         ])
 
-        disturbance = np.array([
-            np.random.normal(0, 0.3),  # x方向扰动
-            np.random.normal(0, 0.3),  # y方向扰动
-            np.random.normal(0, 0.1)  # z方向扰动（较小）
-        ]) * time_step  # 扰动与速度和时间步长相关
+        # 平滑过渡到新方向，保持一定的稳定性
+        self.target_direction = self.DIRECTION_STABILITY * self.target_direction + \
+                               (1 - self.DIRECTION_STABILITY) * new_direction
+        self.target_direction = self.target_direction / np.linalg.norm(self.target_direction)
 
-        return direction, disturbance
+        # 减小扰动幅度，使轨迹更平滑
+        disturbance = np.array([
+            np.random.normal(0, 0.1),  # 减小x方向扰动
+            np.random.normal(0, 0.1),  # 减小y方向扰动
+            np.random.normal(0, 0.05)  # 减小z方向扰动
+        ]) * time_step
+
+        return self.target_direction, disturbance
 
     def update_state(self, time_step):
         """Updates the target position based on the time step.
@@ -367,20 +400,32 @@ class AircraftTargetModel(TargetModel):
         air_resistance = self._calculate_air_resistance()
         direction, disturbance = self._apply_maneuver(time_step)
         altitude_control = self._apply_altitude_control()
-
         speed_control = self._apply_speed_control()
-
-        total_acceleration = (air_resistance +
-                              altitude_control +
-                              disturbance / time_step +
-                              speed_control)
-
+        
+        # 计算期望速度
+        desired_velocity = direction * self.target_speed
+        
+        # 计算速度差异，使用更平滑的过渡
+        velocity_diff = desired_velocity - self.velocity
+        direction_correction = velocity_diff * 0.2  # 平滑系数
+        
+        # 合成加速度
+        total_acceleration = (
+            air_resistance +
+            altitude_control +
+            direction_correction / time_step +  # 方向修正
+            disturbance / time_step +
+            speed_control
+        )
+        
+        # 限制加速度大小
         acc_magnitude = np.linalg.norm(total_acceleration)
         if acc_magnitude > self.MAX_ACCELERATION:
             total_acceleration = total_acceleration * (self.MAX_ACCELERATION / acc_magnitude)
-
+        
+        # 防止NaN和无穷大
         self.acceleration = np.nan_to_num(total_acceleration, nan=0.0, posinf=0.0, neginf=0.0)
-
+        
         # 更新速度和位置
         self.velocity += self.acceleration * time_step
         self.target_position += self.velocity * time_step
