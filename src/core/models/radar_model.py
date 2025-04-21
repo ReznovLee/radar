@@ -139,7 +139,6 @@ class RadarNetwork:
         covering_radars = []
         for radar in self.radars:
             if radar.is_target_in_range(target_position):
-                #  covering_radars.append(radar)
                 covering_radars.append(radar)
 
         covering_radars.sort(

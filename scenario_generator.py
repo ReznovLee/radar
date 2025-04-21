@@ -428,6 +428,7 @@ def generate_trajectory_points(target, samples, dt, targets_data):
             })
             break
 
+
 def generate_aircraft_trajectory_points(target, samples, dt, targets_data):
     """ Function that generates trajectory points for aircraft.
 
@@ -444,10 +445,10 @@ def generate_aircraft_trajectory_points(target, samples, dt, targets_data):
     for _ in range(samples):
         state = target.get_state(current_time)
         current_position = np.array(state[2], dtype=np.float64)
-        
+
         # 确保飞机在合理高度范围内
-        if (current_position[2] >= target.MIN_ALTITUDE - 100 and 
-            current_position[2] <= target.MAX_ALTITUDE + 100):
+        if (current_position[2] >= target.MIN_ALTITUDE - 100 and
+                current_position[2] <= target.MAX_ALTITUDE + 100):
             targets_data.append({
                 'id': state[0],
                 'timestep': current_time,
@@ -465,7 +466,7 @@ def generate_aircraft_trajectory_points(target, samples, dt, targets_data):
                 adjusted_position[2] = target.MIN_ALTITUDE
             elif current_position[2] > target.MAX_ALTITUDE:
                 adjusted_position[2] = target.MAX_ALTITUDE
-                
+
             targets_data.append({
                 'id': state[0],
                 'timestep': current_time,
@@ -476,6 +477,7 @@ def generate_aircraft_trajectory_points(target, samples, dt, targets_data):
             })
             target.update_state(dt)
             current_time += dt
+
 
 def generate_trajectory_points1(target, samples, dt, targets_data):
     """
