@@ -13,7 +13,11 @@ from scipy.linalg import block_diag
 
 
 class MotionModel(Enum):
-    """运动模型类型"""
+    """ Motion model
+
+    List all motion models supported by radar.
+
+    """
     CV = "constant_velocity"
     CA = "constant_acceleration"
     CT = "coordinated_turn"
@@ -23,7 +27,11 @@ class MotionModel(Enum):
 
 
 class ExtendedKalmanFilter:
-    """扩展卡尔曼滤波器基类"""
+    """ Extended Kalman Filter
+
+
+
+    """
 
     def __init__(self, dt, state_dim, measurement_dim):
         self.dt = dt
