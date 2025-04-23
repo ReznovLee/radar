@@ -17,6 +17,13 @@ class MotionModel(Enum):
 
     List all motion models supported by radar.
 
+    Attribute:
+        - CV: continuous velocity model
+        - CA: continuous acceleration model
+        - CT: coordinated turn model
+        - BM: Ballistic motion model
+        - CM_CRUISE: Cruise phase of cruise missile motion model
+        - CM_DIVE: Dive phase of cruise missile motion model
     """
     CV = "constant_velocity"
     CA = "constant_acceleration"
@@ -29,46 +36,112 @@ class MotionModel(Enum):
 class ExtendedKalmanFilter:
     """ Extended Kalman Filter
 
+    Extended Kalman filter base class, used to define EKF basic properties and methods. 
+    Together, these variables form the basic elements of the Extended Kalman Filter, which is used for:
+        - State prediction: using dt, x, P, Q
+        - State update: using x, P, R
+        - Uncertainty propagation: using P, Q, R
 
-
+    Attributes:
+        - dt: The time interval between two consecutive measurements
+        - state_dim: The dimension of the system state vector. 
+                     The CA model has 9 dimensions, and the other models have 6 dimensions.
+        - measurement_dim: Dimensions of the observation vector, used to initialize the measurement noise matrix.
+        - x: State vector, Estimate the current state of the storage system.
+        - P: The state covariance matrix represents the uncertainty of the state estimate.
+        - Q: The process noise covariance matrix represents the uncertainty of the system dynamics model.
+        - R: The measurement noise covariance matrix represents the noise level in the measurement process.
     """
 
     def __init__(self, dt, state_dim, measurement_dim):
+        """ Initializes the Extended Kalman Filter
+
+        The extended Kalman filter initializer is used to declare the relevant property values of
+        the extended Kalman filter.
+
+        :param dt:
+        :param state_dim:
+        :param measurement_dim:
+        """
         self.dt = dt
         self.state_dim = state_dim
         self.measurement_dim = measurement_dim
 
         self.x = np.zeros(state_dim)
-        self.P = np.eye(state_dim) * 100
-        self.Q = np.eye(state_dim) * 0.1
-        self.R = np.eye(measurement_dim) * 1
+        self.P = np.eye(state_dim) * 100  # High uncertainty about the initial state
+        self.Q = np.eye(state_dim) * 0.1  # Have a certain degree of confidence in the system dynamics model
+        
+        # Diagonalizing assumes that the observation noise is independent in each dimension and that
+        # there is a moderate amount of trust in the observations.
+        self.R = np.eye(measurement_dim) * 1  
 
     def f(self, x, dt):
-        """状态转移函数"""
+        """ State transfer function
+
+        There will be other inherited classes implemented to clarify the target state migration under different motion
+        states.
+
+        :param x: The state vector.
+        :param dt: The time interval between two consecutive measurements.
+        """
         raise NotImplementedError
 
     def h(self, x):
-        """观测函数"""
+        """ Observation function
+
+        There will be implementations of other inherited classes to clarify the observation results of EKF on
+        target coordinates under different models.
+
+        :param x: The state vector.
+        :return: The observation result, which only return coordination of the targets.
+        """
         return x[:3]  # 默认只观测位置
 
     def Jacobian_F(self, x, dt):
-        """状态转移矩阵的雅可比矩阵"""
+        """ Jacobian matrix of the state transfer matrix
+
+        The Jacobian matrix of the state transfer matrix, that is, the partial derivative matrix of 
+        the state transfer equation with respect to the state vector, is used to linearize the state 
+        transfer equation and transfer the uncertainty of the state estimation. It will be inherited 
+        and implemented by other motion models.
+
+        :param x: The state vector.
+        :param dt: The time interval between two consecutive measurements.
+        """
         raise NotImplementedError
 
     def Jacobian_H(self, x):
-        """观测矩阵的雅可比矩阵"""
+        """ Jacobian matrix of the measurement matrix
+        
+        The partial derivative matrix of the observation equation with respect to the state vector 
+        is used to linearize the observation equation and establish the mapping relationship between 
+        the state space and the observation space. It will be inherited and implemented by other motion 
+        models.
+        
+        : param x: The state vector.
+        """
         H = np.zeros((3, self.state_dim))
         H[:3, :3] = np.eye(3)
         return H
 
     def predict(self):
-        """预测步骤"""
+        """ Prediction function
+        
+        The state prediction and covariance prediction will be inherited and implemented by different motion models.
+        
+        """
         self.x = self.f(self.x, self.dt)
         F = self.Jacobian_F(self.x, self.dt)
         self.P = F @ self.P @ F.T + self.Q
 
     def update(self, z):
-        """更新步骤"""
+        """ Update function
+
+        Update the state and covariance, and calculate the measurement error and Kalman gain based on the
+        actual observations.
+
+        :param z: The actual observation vector.
+        """
         H = self.Jacobian_H(self.x)
         y = z - self.h(self.x)
         S = H @ self.P @ H.T + self.R
@@ -79,19 +152,40 @@ class ExtendedKalmanFilter:
 
 
 class BallisticMissileEKF(ExtendedKalmanFilter):
-    """弹道导弹EKF"""
+    """ Ballistic Missile extended Kalman Filter class
+
+    The ballistic missile extended Kalman filter model class inherits from the ExtendedKalmanFilter class and
+    rewrites the two methods of State transfer function and Jacobian matrix of the state transfer matrix.
+
+    Attributes:
+        - dt: The time interval between two consecutive measurements.
+    """
 
     def __init__(self, dt):
-        super().__init__(dt, 9, 3)  # 状态：[x, y, z, vx, vy, vz, ax, ay, az]
+        """ Initializes the Ballistic Missile Extended Kalman Filter class
+
+        The BallisticMissileEKF class initializer, inherited from ExtendedKalmanFilter,
+        defines a drag coefficient for a ballistic missile.
+
+        :param dt: The time interval between two consecutive measurements.
+        """
+        super().__init__(dt, 9, 3)  # State: [x, y, z, vx, vy, vz, ax, ay, az]
         self.air_resistance_coef = 0.1
         self.g = 9.81
 
     def f(self, x, dt):
-        """非线性状态转移"""
+        """ Nonlinear state transfer
+
+        The state transition equation of a ballistic missile when it receives basic gravity and wind resistance
+        facing the cross-section.
+
+        :param x: The state vector.
+        :param dt: The time interval between two consecutive measurements.
+        """
         pos = x[:3] + x[3:6] * dt + 0.5 * x[6:9] * dt ** 2
         vel = x[3:6] + x[6:9] * dt
 
-        # 考虑重力和空气阻力的加速度
+        # Acceleration taking into account gravity and air resistance
         v_mag = np.linalg.norm(vel)
         if v_mag > 0:
             air_resistance = -self.air_resistance_coef * v_mag * vel
@@ -99,7 +193,7 @@ class BallisticMissileEKF(ExtendedKalmanFilter):
             air_resistance = np.zeros(3)
 
         acc = air_resistance
-        acc[2] -= self.g  # 添加重力
+        acc[2] -= self.g  # Add gravity
 
         return np.concatenate([pos, vel, acc])
 
