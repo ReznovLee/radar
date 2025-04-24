@@ -127,8 +127,8 @@ class ExtendedKalmanFilter:
     def predict(self):
         """ Prediction function
         
-        The state prediction and covariance prediction will be inherited and implemented by different motion models.
-        
+        The state prediction and covariance prediction will be inherited and implemented by different 
+        motion models.
         """
         self.x = self.f(self.x, self.dt)
         F = self.Jacobian_F(self.x, self.dt)
@@ -198,13 +198,21 @@ class BallisticMissileEKF(ExtendedKalmanFilter):
         return np.concatenate([pos, vel, acc])
 
     def Jacobian_F(self, x, dt):
-        """状态转移雅可比矩阵"""
+        """State transition Jacobian matrix
+        
+        The state transfer Jacobian matrix of the BallisticMissileEKF class is inherited 
+        from the ExtendedKalmanFilter class, and mainly takes into account the Jacobian 
+        term when air resistance exists.
+        
+        :param x: The state vector.
+        :param dt: The time interval between two consecutive measurements.
+        """
         F = np.eye(9)
         F[:3, 3:6] = np.eye(3) * dt
         F[:3, 6:9] = np.eye(3) * (dt ** 2 / 2)
         F[3:6, 6:9] = np.eye(3) * dt
 
-        # 添加空气阻力的雅可比项
+        # Adding the Jacobian term for air resistance
         vel = x[3:6]
         v_mag = np.linalg.norm(vel)
         if v_mag > 0:
@@ -216,25 +224,56 @@ class BallisticMissileEKF(ExtendedKalmanFilter):
 
 
 class CruiseMissileEKF(ExtendedKalmanFilter):
-    """巡航导弹EKF"""
+    """Cruise Missile Extended Kalman Filter Class
 
-    def __init__(self, dt):
+    The cruise missile extended Kalman filter model class inherits from the ExtendedKalmanFilter 
+    class and rewrites the state transfer function and the Jacobian matrix of the state transfer 
+    matrix, and adds a phase determination function to determine which EKF to use.
+
+    Attributes:
+        - dt: The time interval between two consecutive measurements.
+    """
+
+    def __init__(self, dt, height_threshold, dive_angle):
+        """ Class initializer
+
+        The CruiseMissileEKF class initializer inherits from the ExtendedKalmanFilter class 
+        and mainly initializes the height threshold and dive angle.
+
+        :param dt: The time interval between two consecutive measurements.
+        :param height_threshold: The height threshold for switching between cruise and dive phases.
+        :param dive_angle: The dive angle for the missile.
+        """
         super().__init__(dt, 9, 3)
         self.phase = "cruise"
-        self.height_threshold = 1000  # 切换阈值
-        self.dive_angle = np.pi / 4  # 俯冲角
+        self.height_threshold = height_threshold  # Toggle height threshold
+        self.dive_angle = dive_angle
+
+        self.height_history = []
+        self.window_size = 20  # 滑动窗口大小
+        self.decline_threshold = 5  # 连续下降次数阈值
+        self.height_buffer = 800  # 高度缓冲区（米）
 
     def f(self, x, dt):
+        """ State transfer function.
+        
+        Rewrite the state transfer equation, inherit from the ExtendedKalmanFilter class, 
+        and divide the two motion model classes of the cruise missile.
+        
+        :param x: The state vector.
+        :param dt: The time interval between two consecutive measurements.
+        """
+
         if self.phase == "cruise":
-            # CV模型
+            # CV model
             pos = x[:3] + x[3:6] * dt
             vel = x[3:6]
             acc = np.zeros(3)
         else:  # dive phase
-            # 带加速度的斜向运动
+            # Oblique motion with acceleration
             pos = x[:3] + x[3:6] * dt + 0.5 * x[6:9] * dt ** 2
             vel = x[3:6] + x[6:9] * dt
-            # 保持俯冲角加速度
+            # Maintaining the dive angle acceleration
             acc_mag = np.linalg.norm(x[6:9])
             acc = acc_mag * np.array([
                 np.cos(self.dive_angle) * x[3] / np.linalg.norm(x[3:5]),
@@ -244,6 +283,15 @@ class CruiseMissileEKF(ExtendedKalmanFilter):
         return np.concatenate([pos, vel, acc])
 
     def Jacobian_F(self, x, dt):
+        """ State transition Jacobian matrix
+
+        The Jacobian matrix method of overriding state transfer of the CruiseMissileEKF class 
+        is inherited from the ExtendedKalmanFilter class, and solves the Jacobian matrix of 
+        position to velocity and position to acceleration in the cruise and dive phases respectively.
+        
+        :param x: The state vector.
+        :param dt: The time interval between two consecutive measurements.
+        """
         F = np.eye(9)
         F[:3, 3:6] = np.eye(3) * dt
         if self.phase == "dive":
@@ -252,25 +300,71 @@ class CruiseMissileEKF(ExtendedKalmanFilter):
         return F
 
     def check_phase(self, z):
-        """检查是否需要切换阶段"""
-        if z[2] < self.height_threshold and self.phase == "cruise":
-            self.phase = "dive"
-            # 调整过程噪声
-            self.Q[6:9, 6:9] *= 5  # 增加加速度不确定性
+        """ Check if a phase switch is required
+        
+        Use sliding window and trend analysis to determine phase switching:
+        1. Record height history
+        2. Calculate moving average to reduce noise
+        3. Check continuous decline trend
+        4. Consider height buffer to avoid false triggers
+        
+        :param z: The measurement vector [x, y, z].
+        """
+        current_height = z[2]
+        self.height_history.append(current_height)
+        
+        # Keep the window size fixed
+        if len(self.height_history) > self.window_size:
+            self.height_history.pop(0)
+        
+        # Only make judgments after collecting enough samples
+        if len(self.height_history) >= self.window_size and self.phase == "cruise":
+            # Calculate the average height of the sliding window
+            avg_height = sum(self.height_history[-3:]) / 3
+            
+            # Check for a Downtrend
+            decline_count = 0
+            for i in range(len(self.height_history) - 1):
+                if self.height_history[i] > self.height_history[i + 1]:
+                    decline_count += 1
+            
+            # Determine the switching conditions:
+            # 1. The average height is lower than the threshold (considering the buffer zone)
+            # 2. The number of consecutive descents exceeds the threshold
+            # 3. The current height is significantly lower than the historical highest point
+            if (avg_height < self.height_threshold + self.height_buffer and
+                decline_count >= self.decline_threshold and
+                current_height < max(self.height_history) - self.height_buffer):
+                
+                self.phase = "dive"
+                self.Q[6:9, 6:9] *= 5  # Adding acceleration uncertainty
 
 
 class AircraftIMMEKF:
-    """飞机IMM-EKF"""
+    """ Aircraft Interacting Multiple Model Extended Kalman Filter class
+    
+    AircraftIMM-EKF class uses IMM-EKF to build aircraft dynamics models, 
+    mainly including CV model, CA model and CT model.
+
+    Attribute:
+        - dt: The time interval between two consecutive measurements.
+    """
 
     def __init__(self, dt):
+        """ Class initializer
+        Class initializer, used to declare multiple model classes and state 
+        transition probability matrices
+
+        :param dt: The time interval between two consecutive measurements.
+        """
         self.dt = dt
-        # 初始化多个模型
+        # Initializing multiple models
         self.filters = {
             MotionModel.CV: self._create_cv_filter(),
             MotionModel.CT: self._create_ct_filter(),
             MotionModel.CA: self._create_ca_filter()
         }
-        # 模型转移概率矩阵
+        # Model transition probability matrix
         self.transition_matrix = np.array([
             [0.95, 0.025, 0.025],
             [0.025, 0.95, 0.025],
@@ -279,10 +373,13 @@ class AircraftIMMEKF:
         self.model_probs = np.ones(3) / 3
 
     def _create_cv_filter(self):
-        """匀速运动模型"""
+        """ Uniform motion model
+        
+        Uniform linear motion without considering acceleration.
+        """
         class CVFilter(ExtendedKalmanFilter):
             def f(self, x, dt):
-                # 实现匀速运动模型
+                # Implementing a uniform motion model
                 pos = x[:3] + x[3:6] * dt
                 vel = x[3:6]
                 return np.concatenate([pos, vel])
@@ -294,24 +391,24 @@ class AircraftIMMEKF:
 
         ekf = CVFilter(self.dt, 6, 3)
         ekf.Q = block_diag(
-            np.eye(3) * 0.1,  # 位置噪声
-            np.eye(3) * 1.0   # 速度噪声
+            np.eye(3) * 0.1,  # Position noise
+            np.eye(3) * 1.0   # Speed ​​noise
         )
         return ekf
 
     def _create_ct_filter(self):
-        """协调转弯模型"""
+        """Coordinated Turn Model"""
         class CTFilter(ExtendedKalmanFilter):
             def __init__(self, dt, state_dim, measurement_dim):
                 super().__init__(dt, state_dim, measurement_dim)
-                self.turn_rate = 0.1  # 初始转弯角速度
+                self.turn_rate = 0.1  # Initial turning angular velocity
 
             def f(self, x, dt):
-                # 实现协调转弯模型
+                # Implementing a coordinated turning model
                 pos = x[:3]
                 vel = x[3:6]
                 
-                # 更新位置和速度
+                # Update position and velocity
                 pos_new = pos + vel * dt
                 vel_new = np.array([
                     vel[0] * np.cos(self.turn_rate * dt) - vel[1] * np.sin(self.turn_rate * dt),
@@ -324,7 +421,7 @@ class AircraftIMMEKF:
                 F = np.eye(6)
                 F[:3, 3:6] = np.eye(3) * dt
                 
-                # 速度部分的雅可比矩阵
+                # Jacobian matrix of the velocity part
                 omega = self.turn_rate
                 F[3:6, 3:6] = np.array([
                     [np.cos(omega * dt), -np.sin(omega * dt), 0],
@@ -335,16 +432,16 @@ class AircraftIMMEKF:
 
         ekf = CTFilter(self.dt, 6, 3)
         ekf.Q = block_diag(
-            np.eye(3) * 0.1,  # 位置噪声
-            np.eye(3) * 2.0   # 速度噪声（转弯时不确定性更大）
+            np.eye(3) * 0.1,  # Position noise
+            np.eye(3) * 2.0   # Speed ​​noise (greater uncertainty when turning)
         )
         return ekf
 
     def _create_ca_filter(self):
-        """匀加速模型"""
+        """Uniform acceleration model"""
         class CAFilter(ExtendedKalmanFilter):
             def f(self, x, dt):
-                # 实现匀加速运动模型
+                # Implementing a uniformly accelerated motion model
                 pos = x[:3] + x[3:6] * dt + 0.5 * x[6:9] * dt**2
                 vel = x[3:6] + x[6:9] * dt
                 acc = x[6:9]
@@ -359,59 +456,59 @@ class AircraftIMMEKF:
 
         ekf = CAFilter(self.dt, 9, 3)
         ekf.Q = block_diag(
-            np.eye(3) * 0.1,  # 位置噪声
-            np.eye(3) * 1.0,  # 速度噪声
-            np.eye(3) * 2.0   # 加速度噪声
+            np.eye(3) * 0.1,  # Position noise
+            np.eye(3) * 1.0,  # Speed ​​noise
+            np.eye(3) * 2.0   # Acceleration noise
         )
         return ekf
 
     def predict(self):
-        """IMM预测步骤"""
-        # 模型交互
+        """IMM forecasting method"""
+        # Model Interaction
         for i, (model_type, filter) in enumerate(self.filters.items()):
             mixed_mean = np.zeros_like(filter.x)
             mixed_cov = np.zeros_like(filter.P)
 
-            # 混合状态
+            # Mixed state
             for j, (other_type, other_filter) in enumerate(self.filters.items()):
                 if j != i:
-                    # 将状态向量调整为相同维度
+                    # Resize the state vectors to the same dimension
                     if len(other_filter.x) > len(filter.x):
-                        # 如果其他模型维度更高，截取相同维度的部分
+                        # If other models have higher dimensions, cut off the parts with the same dimensions
                         mixed_mean += self.model_probs[j] * other_filter.x[:len(filter.x)]
                     else:
-                        # 如果其他模型维度更低，补零
+                        # If the other model has lower dimension, fill with zeros
                         padded_state = np.pad(other_filter.x, (0, len(filter.x) - len(other_filter.x)))
                         mixed_mean += self.model_probs[j] * padded_state
 
             filter.x = mixed_mean
             filter.P = mixed_cov
 
-            # 预测
+            # predict
             filter.predict()
 
     def update(self, z):
-        """IMM更新步骤"""
+        """IMM Update Method"""
         likelihoods = np.zeros(len(self.filters))
 
-        # 更新每个模型
+        # Update each model
         for i, (_, filter) in enumerate(self.filters.items()):
             filter.update(z)
 
-            # 计算似然度
+            # Calculate likelihood
             innovation = z - filter.h(filter.x)
             S = filter.Jacobian_H(filter.x) @ filter.P @ filter.Jacobian_H(filter.x).T + filter.R
             likelihoods[i] = self._compute_likelihood(innovation, S)
 
-        # 更新模型概率
+        # Update model probability
         c = np.sum(likelihoods * self.model_probs)
         self.model_probs = likelihoods * self.model_probs / c
 
-        # 输出组合估计
+        # Output combination estimation
         return self._combine_estimates()
 
     def _compute_likelihood(self, innovation, S):
-        """计算似然度"""
+        """Calculate likelihood"""
         n = len(innovation)
         det = np.linalg.det(S)
         inv_S = np.linalg.inv(S)
@@ -419,12 +516,12 @@ class AircraftIMMEKF:
         return 1.0 / np.sqrt((2 * np.pi) ** n * det) * np.exp(exp_term)
 
     def _combine_estimates(self):
-        """组合各模型估计"""
-        combined_state = np.zeros(9)  # 使用最大维度
+        """Combining model estimates"""
+        combined_state = np.zeros(9)  # Use maximum dimension
         combined_cov = np.zeros((9, 9))
 
         for i, (_, filter) in enumerate(self.filters.items()):
-            # 填充较小维度的状态向量
+            # Fill the state vector with smaller dimensions
             state = np.pad(filter.x, (0, 9 - len(filter.x)))
             combined_state += state * self.model_probs[i]
 
