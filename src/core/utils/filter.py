@@ -170,8 +170,15 @@ class BallisticMissileEKF(ExtendedKalmanFilter):
         :param dt: The time interval between two consecutive measurements.
         """
         super().__init__(dt, 9, 3)  # State: [x, y, z, vx, vy, vz, ax, ay, az]
-        self.air_resistance_coef = 0.1
+        self.air_resistance_coef = 0.01  # 降低空气阻力系数
         self.g = 9.81
+        
+        # 调整过程噪声
+        self.Q = np.diag([
+            0.1, 0.1, 0.1,  # 位置噪声
+            1.0, 1.0, 1.0,  # 速度噪声
+            2.0, 2.0, 2.0   # 加速度噪声
+        ])
 
     def f(self, x, dt):
         """ Nonlinear state transfer
@@ -463,28 +470,34 @@ class AircraftIMMEKF:
         return ekf
 
     def predict(self):
-        """IMM forecasting method"""
-        # Model Interaction
+        """IMM预测方法"""
+        # 模型交互
+        mixed_states = {}
+        mixed_covs = {}
+        
         for i, (model_type, filter) in enumerate(self.filters.items()):
             mixed_mean = np.zeros_like(filter.x)
             mixed_cov = np.zeros_like(filter.P)
-
-            # Mixed state
+            
+            # 计算混合概率
+            mix_probs = self.transition_matrix[i] * self.model_probs
+            mix_probs = mix_probs / np.sum(mix_probs)
+            
+            # 状态混合
             for j, (other_type, other_filter) in enumerate(self.filters.items()):
-                if j != i:
-                    # Resize the state vectors to the same dimension
-                    if len(other_filter.x) > len(filter.x):
-                        # If other models have higher dimensions, cut off the parts with the same dimensions
-                        mixed_mean += self.model_probs[j] * other_filter.x[:len(filter.x)]
-                    else:
-                        # If the other model has lower dimension, fill with zeros
-                        padded_state = np.pad(other_filter.x, (0, len(filter.x) - len(other_filter.x)))
-                        mixed_mean += self.model_probs[j] * padded_state
-
-            filter.x = mixed_mean
-            filter.P = mixed_cov
-
-            # predict
+                if len(other_filter.x) > len(filter.x):
+                    state = other_filter.x[:len(filter.x)]
+                else:
+                    state = np.pad(other_filter.x, (0, len(filter.x) - len(other_filter.x)))
+                mixed_mean += mix_probs[j] * state
+            
+            mixed_states[model_type] = mixed_mean
+            mixed_covs[model_type] = mixed_cov
+        
+        # 更新每个滤波器的状态和协方差
+        for model_type, filter in self.filters.items():
+            filter.x = mixed_states[model_type]
+            filter.P = mixed_covs[model_type]
             filter.predict()
 
     def update(self, z):
