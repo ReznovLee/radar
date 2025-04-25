@@ -235,23 +235,25 @@ class CruiseMissileEKF(ExtendedKalmanFilter):
         - dt: The time interval between two consecutive measurements.
     """
 
-    def __init__(self, dt):
+    def __init__(self, dt, height_threshold, dive_angle):
         """ Class initializer
 
         The CruiseMissileEKF class initializer inherits from the ExtendedKalmanFilter class 
         and mainly initializes the height threshold and dive angle.
 
         :param dt: The time interval between two consecutive measurements.
+        :param height_threshold: The height threshold for switching between cruise and dive phases.
+        :param dive_angle: The dive angle for the missile.
         """
         super().__init__(dt, 9, 3)
         self.phase = "cruise"
-        self.g = 9.81
-        
+        self.height_threshold = height_threshold  # Toggle height threshold
+        self.dive_angle = dive_angle
+
         self.height_history = []
         self.window_size = 20  # 滑动窗口大小
         self.decline_threshold = 5  # 连续下降次数阈值
-
-        self.R = np.eye(3) * 0.1 # 增加观测噪声，适应可能的机动
+        self.height_buffer = 800  # 高度缓冲区（米）
 
     def f(self, x, dt):
         """ State transfer function.
@@ -262,13 +264,23 @@ class CruiseMissileEKF(ExtendedKalmanFilter):
         :param x: The state vector.
         :param dt: The time interval between two consecutive measurements.
         """
-        pos = x[:3] + x[3:6] * dt + 0.5 * x[6:9] * dt**2
-        vel = x[3:6] + x[6:9] * dt
-        acc = x[6:9].copy() # Use the estimated acceleration
 
-        if self.phase == "dive":
-            acc[2] -= self.g  # Add gravity effect during dive
-
+        if self.phase == "cruise":
+            # CV model
+            pos = x[:3] + x[3:6] * dt
+            vel = x[3:6]
+            acc = np.zeros(3)
+        else:  # dive phase
+            # Oblique motion with acceleration
+            pos = x[:3] + x[3:6] * dt + 0.5 * x[6:9] * dt ** 2
+            vel = x[3:6] + x[6:9] * dt
+            # Maintaining the dive angle acceleration
+            acc_mag = np.linalg.norm(x[6:9])
+            acc = acc_mag * np.array([
+                np.cos(self.dive_angle) * x[3] / np.linalg.norm(x[3:5]),
+                np.cos(self.dive_angle) * x[4] / np.linalg.norm(x[3:5]),
+                -np.sin(self.dive_angle)
+            ])
         return np.concatenate([pos, vel, acc])
 
     def Jacobian_F(self, x, dt):
@@ -283,49 +295,50 @@ class CruiseMissileEKF(ExtendedKalmanFilter):
         """
         F = np.eye(9)
         F[:3, 3:6] = np.eye(3) * dt
-        F[:3, 6:9] = np.eye(3) * (0.5 * dt**2)
-        F[3:6, 6:9] = np.eye(3) * dt
+        if self.phase == "dive":
+            F[:3, 6:9] = np.eye(3) * (dt ** 2 / 2)
+            F[3:6, 6:9] = np.eye(3) * dt
         return F
 
     def check_phase(self, z):
-        """ Check if a phase switch to dive is required based on altitude trend.
-
-        Uses a sliding window to detect sustained altitude decrease.
-        Once switched to dive, it remains in the dive phase.
-
+        """ Check if a phase switch is required
+        
+        Use sliding window and trend analysis to determine phase switching:
+        1. Record height history
+        2. Calculate moving average to reduce noise
+        3. Check continuous decline trend
+        4. Consider height buffer to avoid false triggers
+        
         :param z: The measurement vector [x, y, z].
         """
-        # Only check if currently in cruise phase
-        if self.phase == "cruise":
-            current_height = z[2]
-            self.height_history.append(current_height)
-
-            # Keep the window size fixed
-            if len(self.height_history) > self.window_size:
-                self.height_history.pop(0)
-
-            # Only make judgments after collecting enough samples
-            if len(self.height_history) >= self.window_size:
-                # Check for a sustained downward trend
-                decline_count = 0
-                for i in range(len(self.height_history) - 1):
-                    # Check for decrease, allowing for small noise fluctuations
-                    if self.height_history[i] > self.height_history[i+1] + 1.0: # Add tolerance
-                        decline_count += 1
-                    else:
-                        # Reset count if not decreasing significantly
-                        decline_count = 0 
-
-                # Switch if decline count reaches threshold
-                if decline_count >= self.decline_threshold:
-                    print(f"Switching to DIVE phase at height: {current_height:.2f}")
-                    self.phase = "dive"
-                    # Increase process noise for acceleration when diving
-                    # to allow the filter to adapt faster to new dynamics (gravity, thrust)
-                    q_factor = 10 
-                    self.Q[6, 6] *= q_factor
-                    self.Q[7, 7] *= q_factor
-                    self.Q[8, 8] *= q_factor * 2 # Increase Z-acceleration noise more
+        current_height = z[2]
+        self.height_history.append(current_height)
+        
+        # Keep the window size fixed
+        if len(self.height_history) > self.window_size:
+            self.height_history.pop(0)
+        
+        # Only make judgments after collecting enough samples
+        if len(self.height_history) >= self.window_size and self.phase == "cruise":
+            # Calculate the average height of the sliding window
+            avg_height = sum(self.height_history[-3:]) / 3
+            
+            # Check for a Downtrend
+            decline_count = 0
+            for i in range(len(self.height_history) - 1):
+                if self.height_history[i] > self.height_history[i + 1]:
+                    decline_count += 1
+            
+            # Determine the switching conditions:
+            # 1. The average height is lower than the threshold (considering the buffer zone)
+            # 2. The number of consecutive descents exceeds the threshold
+            # 3. The current height is significantly lower than the historical highest point
+            if (avg_height < self.height_threshold + self.height_buffer and
+                decline_count >= self.decline_threshold and
+                current_height < max(self.height_history) - self.height_buffer):
+                
+                self.phase = "dive"
+                self.Q[6:9, 6:9] *= 5  # Adding acceleration uncertainty
 
 
 class AircraftIMMEKF:
@@ -520,3 +533,221 @@ class AircraftIMMEKF:
             combined_state += state * self.model_probs[i]
 
         return combined_state, combined_cov
+
+
+# !/usr/bin/env python
+# -*- coding: UTF-8 -*-
+"""
+@Project: radar
+@File   : Kalman_filter_test.py
+@IDE    : PyCharm
+@Author : Reznov Lee
+@Date   : 2025/04/24 10:53
+"""
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from src.core.utils.filter import BallisticMissileEKF, CruiseMissileEKF, AircraftIMMEKF
+
+
+class FilterTester:
+    def __init__(self, data_path):
+        """初始化测试器
+        
+        :param data_path: 轨迹数据文件路径
+        """
+        self.data = pd.read_csv(data_path)
+        self.dt = 1.0  # 采样间隔为1秒
+        
+    def calculate_rmse(self, true_positions, estimated_positions):
+        """计算RMSE误差
+        
+        :param true_positions: 真实轨迹点
+        :param estimated_positions: 估计轨迹点
+        :return: 位置RMSE误差
+        """
+        return np.sqrt(np.mean(np.sum((true_positions - estimated_positions) ** 2, axis=1)))
+    
+    def test_ballistic_missile(self, target_id):
+        """测试弹道导弹EKF
+        
+        :param target_id: 目标ID
+        """
+        # 获取目标数据
+        target_data = self.data[self.data['id'] == target_id]
+        
+        # 初始化EKF
+        ekf = BallisticMissileEKF(self.dt)
+        
+        # 第一个时刻：使用零加速度
+        init_pos = target_data.iloc[0][['position_x', 'position_y', 'position_z']].values
+        init_vel = target_data.iloc[0][['velocity_x', 'velocity_y', 'velocity_z']].values
+        init_acc = np.zeros(3)
+        ekf.x = np.concatenate([init_pos, init_vel, init_acc])
+        
+        # 存储结果
+        true_positions = []
+        estimated_positions = []
+        
+        # 记录第一个时刻的结果
+        measurement = target_data.iloc[0][['position_x', 'position_y', 'position_z']].values
+        true_positions.append(measurement)
+        estimated_positions.append(ekf.x[:3])
+        
+        # 从第二个时刻开始，使用速度差计算加速度
+        prev_vel = init_vel
+        for i in range(1, len(target_data)):
+            # 预测
+            ekf.predict()
+            
+            # 获取当前真实状态用于更新
+            curr_pos = target_data.iloc[i][['position_x', 'position_y', 'position_z']].values
+            curr_vel = target_data.iloc[i][['velocity_x', 'velocity_y', 'velocity_z']].values
+            
+            # 更新
+            ekf.update(curr_pos)
+            
+            # 计算真实加速度并更新状态向量中的加速度部分
+            curr_acc = (curr_vel - prev_vel) / self.dt
+            ekf.x[6:] = curr_acc  # 只更新加速度分量
+            
+            # 记录结果
+            true_positions.append(curr_pos)
+            estimated_positions.append(ekf.x[:3])
+            
+            # 更新前一时刻速度
+            prev_vel = curr_vel
+        
+        return np.array(true_positions), np.array(estimated_positions)
+        
+    def test_cruise_missile(self, target_id):
+        """测试巡航导弹EKF
+        
+        :param target_id: 目标ID
+        """
+        target_data = self.data[self.data['id'] == target_id]
+        
+        # 初始化EKF，设置合适的高度阈值和俯冲角
+        ekf = CruiseMissileEKF(self.dt, height_threshold=1000, dive_angle=np.pi/4)
+        
+        # 初始状态
+        init_pos = target_data.iloc[0][['position_x', 'position_y', 'position_z']].values
+        init_vel = target_data.iloc[0][['velocity_x', 'velocity_y', 'velocity_z']].values
+        init_acc = np.zeros(3)
+        ekf.x = np.concatenate([init_pos, init_vel, init_acc])
+        
+        true_positions = []
+        estimated_positions = []
+        
+        for _, row in target_data.iterrows():
+            ekf.predict()
+            measurement = row[['position_x', 'position_y', 'position_z']].values
+            ekf.update(measurement)
+            ekf.check_phase(measurement)  # 检查是否需要切换阶段
+            
+            true_positions.append(measurement)
+            estimated_positions.append(ekf.x[:3])
+            
+        return np.array(true_positions), np.array(estimated_positions)
+    
+    def test_aircraft(self, target_id):
+        """测试飞机IMM-EKF
+        
+        :param target_id: 目标ID
+        """
+        target_data = self.data[self.data['id'] == target_id]
+        
+        # 初始化IMM-EKF
+        ekf = AircraftIMMEKF(self.dt)
+        
+        # 初始状态
+        init_pos = target_data.iloc[0][['position_x', 'position_y', 'position_z']].values
+        init_vel = target_data.iloc[0][['velocity_x', 'velocity_y', 'velocity_z']].values
+        
+        # 为每个子滤波器设置初始状态
+        for filter_name, filter_obj in ekf.filters.items():
+            if filter_name in ['CV', 'CT']:  # CV和CT模型是6维状态
+                filter_obj.x = np.array(np.concatenate([init_pos, init_vel]), dtype=np.float64)
+                filter_obj.P = np.eye(6) * 100  # 6x6协方差矩阵
+            elif filter_name == 'CA':  # CA模型是9维状态
+                filter_obj.x = np.array(np.concatenate([init_pos, init_vel, np.zeros(3)]), dtype=np.float64)
+                filter_obj.P = np.eye(9) * 100  # 9x9协方差矩阵
+        
+        true_positions = []
+        estimated_positions = []
+        
+        for _, row in target_data.iterrows():
+            ekf.predict()
+            measurement = row[['position_x', 'position_y', 'position_z']].values.astype(np.float64)
+            ekf.update(measurement)
+            
+            # 获取组合后的状态估计
+            combined_state, _ = ekf._combine_estimates()  # 使用_combine_estimates方法
+            state_estimate = combined_state[:3]  # 提取位置分量
+            
+            true_positions.append(measurement)
+            estimated_positions.append(state_estimate)
+            
+        return np.array(true_positions), np.array(estimated_positions)
+    
+    def plot_results(self, true_pos, est_pos, target_type):
+        """绘制跟踪结果
+        
+        :param true_pos: 真实轨迹
+        :param est_pos: 估计轨迹
+        :param target_type: 目标类型
+        """
+        fig = plt.figure(figsize=(15, 5))
+        
+        # 3D轨迹图
+        ax1 = fig.add_subplot(121, projection='3d')
+        ax1.plot(true_pos[:, 0], true_pos[:, 1], true_pos[:, 2], 'b-', label='True')
+        ax1.plot(est_pos[:, 0], est_pos[:, 1], est_pos[:, 2], 'r--', label='Estimated')
+        ax1.set_xlabel('X (m)')
+        ax1.set_ylabel('Y (m)')
+        ax1.set_zlabel('Z (m)')
+        ax1.set_title(f'{target_type} Tracking - 3D Trajectory')
+        ax1.legend()
+        
+        # 误差图
+        ax2 = fig.add_subplot(122)
+        # 确保数据类型为numpy数组并计算误差
+        true_pos = np.array(true_pos, dtype=np.float64)
+        est_pos = np.array(est_pos, dtype=np.float64)
+        errors = np.linalg.norm(true_pos - est_pos, axis=1)
+        ax2.plot(errors)
+        ax2.set_xlabel('Time Step')
+        ax2.set_ylabel('Position Error (m)')
+        ax2.set_title('Tracking Error')
+        
+        plt.tight_layout()
+        plt.show()
+
+
+def main():
+    # 初始化测试器
+    tester = FilterTester("output/scenario-2025-04-17/10-targets.csv")
+    
+    # 测试弹道导弹跟踪 (ID=1)
+    true_pos_bm, est_pos_bm = tester.test_ballistic_missile(1)
+    rmse_bm = tester.calculate_rmse(true_pos_bm, est_pos_bm)
+    print(f"Ballistic Missile RMSE: {rmse_bm:.2f} meters")
+    tester.plot_results(true_pos_bm, est_pos_bm, "Ballistic Missile")
+    
+    # 测试巡航导弹跟踪 (ID=2)
+    true_pos_cm, est_pos_cm = tester.test_cruise_missile(2)
+    rmse_cm = tester.calculate_rmse(true_pos_cm, est_pos_cm)
+    print(f"Cruise Missile RMSE: {rmse_cm:.2f} meters")
+    tester.plot_results(true_pos_cm, est_pos_cm, "Cruise Missile")
+    
+    # 测试飞机跟踪 (ID=6)
+    true_pos_ac, est_pos_ac = tester.test_aircraft(6)  # 修改为ID=6
+    rmse_ac = tester.calculate_rmse(true_pos_ac, est_pos_ac)
+    print(f"Aircraft RMSE: {rmse_ac:.2f} meters")
+    tester.plot_results(true_pos_ac, est_pos_ac, "Aircraft")
+
+
+if __name__ == "__main__":
+    main()
+
+

@@ -42,31 +42,47 @@ class FilterTester:
         # 初始化EKF
         ekf = BallisticMissileEKF(self.dt)
         
-        # 初始状态
+        # 第一个时刻：使用零加速度
         init_pos = target_data.iloc[0][['position_x', 'position_y', 'position_z']].values
         init_vel = target_data.iloc[0][['velocity_x', 'velocity_y', 'velocity_z']].values
-        init_acc = np.zeros(3)  # 初始加速度假设为0
+        init_acc = np.zeros(3)
         ekf.x = np.concatenate([init_pos, init_vel, init_acc])
         
         # 存储结果
         true_positions = []
         estimated_positions = []
         
-        # 逐步跟踪
-        for _, row in target_data.iterrows():
+        # 记录第一个时刻的结果
+        measurement = target_data.iloc[0][['position_x', 'position_y', 'position_z']].values
+        true_positions.append(measurement)
+        estimated_positions.append(ekf.x[:3])
+        
+        # 从第二个时刻开始，使用速度差计算加速度
+        prev_vel = init_vel
+        for i in range(1, len(target_data)):
             # 预测
             ekf.predict()
             
+            # 获取当前真实状态用于更新
+            curr_pos = target_data.iloc[i][['position_x', 'position_y', 'position_z']].values
+            curr_vel = target_data.iloc[i][['velocity_x', 'velocity_y', 'velocity_z']].values
+            
             # 更新
-            measurement = row[['position_x', 'position_y', 'position_z']].values
-            ekf.update(measurement)
+            ekf.update(curr_pos)
+            
+            # 计算真实加速度并更新状态向量中的加速度部分
+            curr_acc = (curr_vel - prev_vel) / self.dt
+            ekf.x[6:] = curr_acc  # 只更新加速度分量
             
             # 记录结果
-            true_positions.append(measurement)
+            true_positions.append(curr_pos)
             estimated_positions.append(ekf.x[:3])
+            
+            # 更新前一时刻速度
+            prev_vel = curr_vel
         
         return np.array(true_positions), np.array(estimated_positions)
-    
+        
     def test_cruise_missile(self, target_id):
         """测试巡航导弹EKF
         
@@ -75,25 +91,36 @@ class FilterTester:
         target_data = self.data[self.data['id'] == target_id]
         
         # 初始化EKF，设置合适的高度阈值和俯冲角
-        ekf = CruiseMissileEKF(self.dt, height_threshold=1000, dive_angle=np.pi/4)
+        ekf = CruiseMissileEKF(self.dt)
         
         # 初始状态
         init_pos = target_data.iloc[0][['position_x', 'position_y', 'position_z']].values
         init_vel = target_data.iloc[0][['velocity_x', 'velocity_y', 'velocity_z']].values
-        init_acc = np.zeros(3)
+        init_acc = np.zeros(3) # Start with zero acceleration assumption
         ekf.x = np.concatenate([init_pos, init_vel, init_acc])
         
         true_positions = []
         estimated_positions = []
+        phases = []
         
-        for _, row in target_data.iterrows():
+        measurement = target_data.iloc[0][['position_x', 'position_y', 'position_z']].values
+        true_positions.append(measurement)
+        estimated_positions.append(ekf.x[:3])
+        phases.append(ekf.phase)
+
+        for i in range(1, len(target_data)):
+            row = target_data.iloc[i]
             ekf.predict()
-            measurement = row[['position_x', 'position_y', 'position_z']].values
+            measurement = row[['position_x', 'position_y', 'position_z']].values.astype(np.float64)
             ekf.update(measurement)
             ekf.check_phase(measurement)  # 检查是否需要切换阶段
-            
+
             true_positions.append(measurement)
             estimated_positions.append(ekf.x[:3])
+            phases.append(ekf.phase) # Optional: track phase changes
+
+        # Optional: Print phase transition info
+        # print(f"Target {target_id} phase history: {phases}")
             
         return np.array(true_positions), np.array(estimated_positions)
     
@@ -188,7 +215,7 @@ def main():
     tester.plot_results(true_pos_cm, est_pos_cm, "Cruise Missile")
     
     # 测试飞机跟踪 (ID=6)
-    true_pos_ac, est_pos_ac = tester.test_aircraft(6)  # 修改为ID=6
+    true_pos_ac, est_pos_ac = tester.test_aircraft(7)  # 修改为ID=7
     rmse_ac = tester.calculate_rmse(true_pos_ac, est_pos_ac)
     print(f"Aircraft RMSE: {rmse_ac:.2f} meters")
     tester.plot_results(true_pos_ac, est_pos_ac, "Aircraft")
@@ -196,5 +223,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
