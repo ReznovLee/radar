@@ -10,7 +10,7 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from src.core.utils.filter import BallisticMissileEKF, CruiseMissileEKF, AircraftIMMEKF
+from src.core.utils.filter import BallisticMissileEKF, CruiseMissileEKF, AircraftIMMEKF, Filter
 
 
 class FilterTester:
@@ -345,3 +345,11 @@ def main():
 
 if __name__ == "__main__":
     main()
+    test_param = Filter("output/scenario-2025-04-28/10-targets.csv")
+    true_BM, perdit_BM = test_param.test_ballistic_missile(1)
+    true_CM, perdit_CM = test_param.test_cruise_missile(2)
+    true_AC, perdit_AC = test_param.test_aircraft(7)
+    print(perdit_BM)
+    print(perdit_CM)
+    print(perdit_AC)
+    
