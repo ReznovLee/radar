@@ -303,73 +303,50 @@ def generate_random_targets(center_drop_position_str, target_dispersion_rate, ti
         current_id += 1
 
     for _ in range(aircraft_counts):
-        """
-        target_end_point = np.array([
+        # 1. Generate initial position far from the center
+        initial_distance = random.uniform(50000, 100000) # Start 50-100km away
+        initial_angle = random.uniform(0, 2 * math.pi)
+        initial_position = np.array([
+            center_drop_position[0] + initial_distance * math.cos(initial_angle),
+            center_drop_position[1] + initial_distance * math.sin(initial_angle),
+            random.uniform(AircraftTargetModel.MIN_ALTITUDE, AircraftTargetModel.MAX_ALTITUDE) # Start within altitude limits
+        ])
+
+        # 2. Define a target point near the center drop position to aim towards
+        target_point_near_center = np.array([
             center_drop_position[0] + np.random.uniform(-target_distribution_range, target_distribution_range),
             center_drop_position[1] + np.random.uniform(-target_distribution_range, target_distribution_range),
-            np.random.uniform(5000, 13000)
+            # Z component of target point doesn't strictly matter for initial horizontal velocity
+            random.uniform(AircraftTargetModel.MIN_ALTITUDE, AircraftTargetModel.MAX_ALTITUDE)
         ])
 
-        # 计算水平面上的飞行方向（只考虑x-y平面）
-        delta_x = target_end_point[0] - center_drop_position[0]
-        delta_y = target_end_point[1] - center_drop_position[1]
-        direction = np.array([delta_x, delta_y]) / np.sqrt(delta_x ** 2 + delta_y ** 2)
+        # 3. Calculate initial velocity direction towards the target point
+        direction_vector = target_point_near_center - initial_position
+        direction_xy = direction_vector[:2] # Horizontal direction
 
-        initial_position = np.array([
-            target_end_point[0] - direction[0] * aircraft_speed * time_to_impact,
-            target_end_point[1] - direction[1] * aircraft_speed * time_to_impact,
-            np.random.uniform(5000, 13000)
-        ])
+        # Normalize horizontal direction
+        norm_xy = np.linalg.norm(direction_xy)
+        if norm_xy < 1e-6: # Avoid division by zero if start point is too close horizontally
+            # Default to a random horizontal direction if norm is too small
+             random_angle = random.uniform(0, 2 * math.pi)
+             direction_xy_norm = np.array([math.cos(random_angle), math.sin(random_angle)])
+        else:
+             direction_xy_norm = direction_xy / norm_xy
 
+        # Set initial velocity
         initial_velocity = np.array([
-            aircraft_speed * direction[0],
-            aircraft_speed * direction[1],
-            np.random.uniform(-50, 50)
+            aircraft_speed * direction_xy_norm[0],
+            aircraft_speed * direction_xy_norm[1],
+            0.0  # Start with zero vertical velocity, altitude control is handled later
         ])
 
+        # 4. Create AircraftTargetModel and generate trajectory
         target = AircraftTargetModel(
             current_id,
             initial_position,
             initial_velocity
         )
-        generate_trajectory_points(target, TOTAL_SAMPLE, dt, targets_data)
-        current_id += 1
-        """
-        theta = random.uniform(math.pi / 4, 3 * math.pi / 4)
-        r = 50000  # 设置合理的初始距离
-
-        # 计算初始位置
-        initial_position = np.array([
-            center_drop_position[0] + r * math.cos(theta),
-            center_drop_position[1] + r * math.sin(theta),
-            random.uniform(AircraftTargetModel.MIN_ALTITUDE, AircraftTargetModel.MAX_ALTITUDE)
-        ])
-
-        # 计算终点位置（镜像）
-        end_position = np.array([
-            center_drop_position[0] - (initial_position[0] - center_drop_position[0]),
-            center_drop_position[1] - (initial_position[1] - center_drop_position[1]),
-            random.uniform(AircraftTargetModel.MIN_ALTITUDE, AircraftTargetModel.MAX_ALTITUDE)
-        ])
-
-        # 计算初始速度方向
-        direction = end_position - initial_position
-        direction_xy = direction[:2] / np.linalg.norm(direction[:2])
-
-        # 确保初始速度大小合理
-        # initial_speed = min(aircraft_speed, 300)  # 限制最大初始速度
-        initial_speed = aircraft_speed
-        initial_velocity = np.array([
-            initial_speed * direction_xy[0],
-            initial_speed * direction_xy[1],
-            0
-        ])
-
-        target = AircraftTargetModel(
-            current_id,
-            initial_position,
-            initial_velocity
-        )
+        # Use the dedicated aircraft trajectory generator which handles altitude constraints
         generate_aircraft_trajectory_points(target, TOTAL_SAMPLE, dt, targets_data)
         current_id += 1
 
