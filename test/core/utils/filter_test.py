@@ -200,7 +200,7 @@ class FilterTester:
 
 def main():
     # 初始化测试器
-    tester = FilterTester("output/scenario-2025-04-17/10-targets.csv")
+    tester = FilterTester("output/scenario-2025-04-28/10-targets.csv")
     
     # 测试弹道导弹跟踪 (ID=1)
     true_pos_bm, est_pos_bm = tester.test_ballistic_missile(1)

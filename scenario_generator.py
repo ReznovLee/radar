@@ -282,7 +282,7 @@ def generate_random_targets(center_drop_position_str, target_dispersion_rate, ti
             initial_cruise_altitude
         ])
 
-        # 将标量加速度转换为向量形式
+        # 将标量加速度轉換為向量形式
         rocket_acceleration = rocket_acceleration_magnitude * dive_direction
 
         # 初始速度（巡航阶段平均速度）
@@ -432,51 +432,73 @@ def generate_trajectory_points(target, samples, dt, targets_data):
 def generate_aircraft_trajectory_points(target, samples, dt, targets_data):
     """ Function that generates trajectory points for aircraft.
 
-    This function is specifically designed for aircraft trajectory generation. Unlike missiles,
-    aircraft maintain their flight within a specified altitude range and don't need landing calculations.
+    This function generates aircraft trajectory points. If the aircraft's altitude
+    goes outside the defined MIN/MAX range, it adjusts the vertical velocity
+    to guide it back smoothly, avoiding abrupt position changes.
 
-    :param target: aircraft target object initialized from AircraftTargetModel
+    :param target: aircraft target object initialized from AircraftTargetModel (assumes target.velocity is accessible)
     :param samples: number of samples needed
     :param dt: time step
     :param targets_data: list to store trajectory data
     """
     current_time = 0
+    # Define vertical correction speed (adjust as needed for smoothness)
+    CORRECTION_VZ_UP = 20.0   # Speed to apply when below min altitude
+    CORRECTION_VZ_DOWN = -20.0 # Speed to apply when above max altitude
 
     for _ in range(samples):
+        # 1. Get current state
         state = target.get_state(current_time)
         current_position = np.array(state[2], dtype=np.float64)
+        current_velocity = np.array(state[3], dtype=np.float64) # Keep current velocity for recording
 
-        # 确保飞机在合理高度范围内
-        if (current_position[2] >= target.MIN_ALTITUDE - 100 and
-                current_position[2] <= target.MAX_ALTITUDE + 100):
-            targets_data.append({
-                'id': state[0],
-                'timestep': current_time,
-                'position': current_position.copy(),
-                'velocity': np.array(state[3], dtype=np.float64).copy(),
-                'target_type': state[4],
-                'priority': state[5]
-            })
-            target.update_state(dt)
-            current_time += dt
-        else:
-            # 如果超出高度范围，调整高度到允许范围内
-            adjusted_position = current_position.copy()
-            if current_position[2] < target.MIN_ALTITUDE:
-                adjusted_position[2] = target.MIN_ALTITUDE
-            elif current_position[2] > target.MAX_ALTITUDE:
-                adjusted_position[2] = target.MAX_ALTITUDE
+        # 2. Record the current state *before* applying corrections for the next step
+        targets_data.append({
+            'id': state[0],
+            'timestep': current_time,
+            'position': current_position.copy(),
+            'velocity': current_velocity.copy(), # Record the actual velocity at this time step
+            'target_type': state[4],
+            'priority': state[5]
+        })
 
-            targets_data.append({
-                'id': state[0],
-                'timestep': current_time,
-                'position': adjusted_position,
-                'velocity': np.array(state[3], dtype=np.float64).copy(),
-                'target_type': state[4],
-                'priority': state[5]
-            })
-            target.update_state(dt)
-            current_time += dt
+        # 3. Check altitude and determine if correction is needed for the *next* state update
+        needs_correction = False
+        target_vz = current_velocity[2] # Default to current vz if no correction needed
+
+        if current_position[2] < target.MIN_ALTITUDE:
+            # Apply upward correction velocity for the next update step
+            target_vz = CORRECTION_VZ_UP
+            needs_correction = True
+            # Optional: print a warning
+            # print(f"Warning: Aircraft {state[0]} below min altitude ({current_position[2]:.2f}m). Applying upward correction.")
+        elif current_position[2] > target.MAX_ALTITUDE:
+            # Apply downward correction velocity for the next update step
+            target_vz = CORRECTION_VZ_DOWN
+            needs_correction = True
+            # Optional: print a warning
+            # print(f"Warning: Aircraft {state[0]} above max altitude ({current_position[2]:.2f}m). Applying downward correction.")
+
+        # 4. Apply correction to the target's internal state *before* the update
+        #    This assumes direct modification of target.velocity is possible and intended.
+        if needs_correction:
+            # Directly modify the target's internal velocity for the next update calculation
+            # Ensure target object allows this modification.
+            try:
+                 target.velocity[2] = target_vz
+                 # If the model also uses acceleration, consider resetting vertical acceleration
+                 # if hasattr(target, 'acceleration'):
+                 #    target.acceleration[2] = 0.0
+            except AttributeError:
+                 print(f"Error: Cannot directly modify target.velocity for Aircraft {state[0]}. Model modification might be needed.")
+                 # Decide how to handle this - maybe break or continue without correction?
+                 pass # Continue without correction for now if attribute doesn't exist
+
+        # 5. Update the target's state using the (potentially modified) velocity
+        target.update_state(dt)
+
+        # 6. Increment time
+        current_time += dt
 
 
 def generate_trajectory_points1(target, samples, dt, targets_data):

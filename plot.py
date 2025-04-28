@@ -113,8 +113,8 @@ def plot_scenario(radar_file: str, target_file: str, save_path: str = None):
 
 if __name__ == "__main__":
     # 示例文件路径（需替换为实际路径）
-    radar_csv = "output/scenario-2025-04-17/5-radar.csv"
-    target_csv = "output/scenario-2025-04-17/10-targets.csv"
-    save_image = "output/scenario-2025-04-17/scenario_visualization.png"
+    radar_csv = "output/scenario-2025-04-28/5-radar.csv"
+    target_csv = "output/scenario-2025-04-28/10-targets_copy.csv"
+    save_image = "output/scenario-2025-04-28/scenario_visualization.png"
 
     plot_scenario(radar_csv, target_csv, save_image)

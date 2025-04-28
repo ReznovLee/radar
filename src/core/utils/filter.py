@@ -251,7 +251,7 @@ class CruiseMissileEKF(ExtendedKalmanFilter):
         self.window_size = 20  # 滑动窗口大小
         self.decline_threshold = 5  # 连续下降次数阈值
 
-        self.R = np.eye(3) * 0.1 # 增加观测噪声，适应可能的机动
+        self.R = np.eye(3) * 0.5 # 增加观测噪声，适应可能的机动
 
     def f(self, x, dt):
         """ State transfer function.
