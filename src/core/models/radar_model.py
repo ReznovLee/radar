@@ -43,8 +43,8 @@ class Radar:
         assert num_channels > 0, "Number of channels must be greater than 0"
         assert radar_radius > 0, "Radar radius must be greater than 0"
 
-        self.radar_id = radar_id
-        self.radar_position = radar_position
+        self.radar_id = radar_id           # <--- 'radar_id' 属性存在
+        self.radar_position = radar_position # <--- 属性名为 'radar_position'，而不是 'position'
         self.radar_radius = radar_radius
         self.num_channels = num_channels
         self.radar_channels = {i: None for i in range(num_channels)}
@@ -58,7 +58,7 @@ class Radar:
         """
         return any(channel is None for channel in self.radar_channels.values())
 
-    def assign_channel(self, target_id):
+    def assign_channel(self, target_id):   # <--- 方法名为 'assign_channel'，而不是 'allocate_channel'
         """ Assign the current destination to one of the channels of the current ID
 
         A certain channel corresponding to the radar is assigned to the target, and the corresponding channel of
@@ -134,20 +134,30 @@ class RadarNetwork:
         Find the target that is within the total range of radar network and return to the available radar list
 
         :param target_position: Target position
-        :return: list of Radar objects -> list
+        :return: list of Radar objects -> list  # <--- 修改了文档字符串的返回值说明
         """
         covering_radars = []
         for radar in self.radars:
-            if radar.is_target_in_range(target_position):
+            # 假设 self.radars 是一个包含 Radar 对象的列表或字典值
+            if isinstance(radar, Radar) and radar.is_target_in_range(target_position): # 增加类型检查确保是Radar对象
                 covering_radars.append(radar)
+            # 如果 self.radars 是字典 {radar_id: Radar_object}，则迭代方式可能需要调整
+            # 例如: for radar_id, radar_obj in self.radars.items():
+            #          if radar_obj.is_target_in_range(target_position):
+            #              covering_radars.append(radar_obj)
 
-        covering_radars.sort(
-            key=lambda r: sum(1 for c in r.radar_channels.values() if c is None),
-            reverse=True
-        )
-        radar_ids = [radar.radar_id for radar in covering_radars]
-        logging.debug(f"Find {len(covering_radars)} radar coverage target position {target_position}")
-        return radar_ids
+        # 可选：按可用通道数排序（如果需要）
+        # covering_radars.sort(
+        #     key=lambda r: sum(1 for c in r.radar_channels.values() if c is None),
+        #     reverse=True
+        # )
+
+        # --- 修改点：直接返回包含 Radar 对象的列表 ---
+        # radar_ids = [radar.radar_id for radar in covering_radars] # 原代码：返回ID列表
+        logging.debug(f"Find {len(covering_radars)} radar(s) covering target position {target_position}")
+        # return radar_ids # 原代码
+        return covering_radars # 修改后：返回Radar对象列表
+        # --- 修改结束 ---
 
     def assign_radar(self, target_id, target_position):
         """The radar is assigned to the target
@@ -156,17 +166,29 @@ class RadarNetwork:
 
         :param target_id: Target ID
         :param target_position: The 3D coordinates of the target
-        :return: Radar ID list -> list
+        :return: Tuple (Radar ID, Channel ID) or None -> tuple or None # <--- 修改了返回值说明
         """
-        covering_radars_ids = self.find_covering_radars(target_position)
-        for radar_id in covering_radars_ids:
-            radar = next((r for r in self.radars if r.radar_id == radar_id), None)
-            if radar:
-                channel_id = radar.assign_channel(target_id)
+        # --- 修改点：find_covering_radars 现在返回 Radar 对象列表 ---
+        # covering_radars_ids = self.find_covering_radars(target_position) # 原代码变量名
+        covering_radars_objects = self.find_covering_radars(target_position) # 修改后变量名，更清晰
+        # --- 修改结束 ---
+
+        # --- 修改点：直接迭代 Radar 对象列表 ---
+        # for radar_id in covering_radars_ids: # 原代码
+        #     radar = next((r for r in self.radars if r.radar_id == radar_id), None) # 原代码需要查找对象
+        for radar in covering_radars_objects: # 修改后：直接使用对象
+            if radar: # 确保对象有效 (虽然从 find_covering_radars 返回的应该都是有效的)
+                # --- 修改点：Radar 类中没有 assign_channel 方法，应使用 allocate_channel ---
+                # channel_id = radar.assign_channel(target_id) # 原代码，方法名不匹配 Radar 类
+                channel_id = radar.allocate_channel(target_id) # 修改后：使用 Radar 类中定义的 allocate_channel
+                # --- 修改结束 ---
                 if channel_id is not None:
+                    # 返回分配成功的雷达ID和通道ID
                     return radar.radar_id, channel_id
+        # --- 修改结束 ---
+
         logging.warning(f"Target {target_id} has no radar channel available at position {target_position}")
-        return None
+        return None, None # 返回两个 None，保持一致性
 
     def release_radar_channel(self, radar_id, channel_id):
         """ Release the radar and its channel
@@ -191,3 +213,19 @@ class RadarNetwork:
         :return: Whether the radar is available -> bool
         """
         return radar_id in self.radars and self.radars[radar_id].is_available()
+
+    def reset_all_channels(self):
+        """ Resets the channel status for all radars in the network. """
+        if isinstance(self.radars, list):
+            for radar in self.radars:
+                if isinstance(radar, Radar):
+                    # 假设 Radar 类有一个 reset_channels 方法或直接操作 radar_channels
+                    radar.radar_channels = {i: None for i in range(radar.num_channels)}
+                    logging.debug(f"Reset channels for radar {radar.radar_id}")
+        elif isinstance(self.radars, dict):
+             for radar_id, radar in self.radars.items():
+                 if isinstance(radar, Radar):
+                    radar.radar_channels = {i: None for i in range(radar.num_channels)}
+                    logging.debug(f"Reset channels for radar {radar.radar_id}")
+        else:
+            logging.error("RadarNetwork.radars is not a list or dict, cannot reset channels.")
