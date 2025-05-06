@@ -43,8 +43,8 @@ class Radar:
         assert num_channels > 0, "Number of channels must be greater than 0"
         assert radar_radius > 0, "Radar radius must be greater than 0"
 
-        self.radar_id = radar_id           # <--- 'radar_id' 属性存在
-        self.radar_position = radar_position # <--- 属性名为 'radar_position'，而不是 'position'
+        self.radar_id = radar_id
+        self.radar_position = radar_position
         self.radar_radius = radar_radius
         self.num_channels = num_channels
         self.radar_channels = {i: None for i in range(num_channels)}
@@ -58,7 +58,7 @@ class Radar:
         """
         return any(channel is None for channel in self.radar_channels.values())
 
-    def assign_channel(self, target_id):   # <--- 方法名为 'assign_channel'，而不是 'allocate_channel'
+    def assign_channel(self, target_id):
         """ Assign the current destination to one of the channels of the current ID
 
         A certain channel corresponding to the radar is assigned to the target, and the corresponding channel of
@@ -212,7 +212,7 @@ class RadarNetwork:
         :param radar_id: Radar ID
         :return: Whether the radar is available -> bool
         """
-        return radar_id in self.radars and self.radars[radar_id].is_available()
+        return radar_id in self.radars and self.radars[radar_id].is_radar_available()
 
     def reset_all_channels(self):
         """ Resets the channel status for all radars in the network. """
