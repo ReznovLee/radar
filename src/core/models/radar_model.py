@@ -127,6 +127,12 @@ class RadarNetwork:
         :param radars: List of Radar objects
         """
         self.radars = radars
+        if isinstance(self.radars, dict):
+            self.radar_ids = list(self.radars.keys())
+        elif isinstance(self.radars, list):
+            self.radar_ids = [r.radar_id for r in self.radars]
+        else:
+            self.radar_ids = []
 
     def find_covering_radars(self, target_position):
         """ Find all radars covering the target position

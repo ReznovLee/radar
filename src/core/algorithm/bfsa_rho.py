@@ -86,15 +86,24 @@ class BFSARHO:
     def _backward_stage(self, num_targets, num_radars):
         """历史加权分配，缺省部分未分配"""
         window = self.history[-self.window_size:]
-        weights = np.array([0.9 ** (len(window) - 1 - i) for i in range(len(window))])
+        # 只保留shape一致的历史分配
+        valid_pairs = [(A, w) for A, w in zip(window, np.array([0.9 ** (len(window) - 1 - i) for i in range(len(window))]))
+                       if A.shape == (num_targets, num_radars)]
+        if not valid_pairs:
+            # 没有可用历史，返回全零分配
+            return csr_matrix((num_targets, num_radars), dtype=np.int8)
+        weights = np.array([w for _, w in valid_pairs])
         weights /= weights.sum()
-        weighted_matrix = sum(A.multiply(w) for A, w in zip(window, weights))
+        matrices = [A for A, _ in valid_pairs]
+        weighted_matrix = sum(A.multiply(w) for A, w in zip(matrices, weights))
         # 归一化
         row_sum = weighted_matrix.sum(axis=1).A.ravel()
         row_sum[row_sum == 0] = 1
         normalized = weighted_matrix.multiply(1 / row_sum[:, None])
         assignment = csr_matrix((num_targets, num_radars), dtype=np.int8)
-        for i in range(normalized.shape[0]):
+        for i in range(num_targets):
+            if i >= normalized.shape[0]:
+                break
             row = normalized.getrow(i).toarray().ravel()
             if np.any(row > 0):
                 j = np.argmax(row)
@@ -108,20 +117,26 @@ class BFSARHO:
             target_id = obs['id']
             pos = np.array(obs['position'])
             # 选择滤波器类型
-            ttype = next((t['type'] for t in targets if t['id'] == target_id), "aircraft")
+            ttype = next((t['target_type'] for t in targets if t['id'] == target_id), "aircraft")
             if target_id not in self.trackers:
                 if ttype == "ballistic":
                     self.trackers[target_id] = BallisticMissileEKF(dt=1.0)
+                    self.trackers[target_id].x[:3] = pos
                 elif ttype == "cruise":
                     self.trackers[target_id] = CruiseMissileEKF(dt=1.0)
+                    self.trackers[target_id].x[:3] = pos
                 else:
                     self.trackers[target_id] = AircraftIMMEKF(dt=1.0)
-                self.trackers[target_id].x[:3] = pos
+                    for filter_obj in self.trackers[target_id].filters.values():
+                        filter_obj.x[:3] = pos
             else:
                 self.trackers[target_id].predict()
                 self.trackers[target_id].update(pos)
             # 预测未来状态
-            pred_pos = self.trackers[target_id].x[:3]
+            if isinstance(self.trackers[target_id], AircraftIMMEKF):
+                pred_pos = self.trackers[target_id]._combine_estimates()[0][:3]
+            else:
+                pred_pos = self.trackers[target_id].x[:3]
             # 动态领域生成：找覆盖预测位置的所有可用雷达
             candidate_radars = []
             for j, radar_id in enumerate(self.radar_ids):
@@ -179,10 +194,27 @@ class BFSARHO:
         return assignment
 
     def _evaluate_assignment(self, target_idx, radar_j, assignment, targets):
-        """评价函数：可结合优先级、切换次数等"""
-        # 这里简单用优先级，实际可结合metrics.py更复杂指标
-        priority = targets[target_idx].get('priority', 1)
-        return 1.0 / (priority + 1e-3)
+        """
+        综合评价函数：最大化跟踪时间，最小化切换，最大化跟踪率
+        """
+        tracking_score = 1.0
+        switch_penalty = 0.0
+        if self.history:
+            prev_assignment = self.history[-1]
+            prev_radar = prev_assignment.getrow(target_idx).nonzero()[1]
+            if prev_radar.size > 0 and prev_radar[0] != radar_j:
+                switch_penalty = 1.0
+        tracking_history = []
+        for hist in self.history:
+            row = hist.getrow(target_idx).toarray().ravel()
+            tracking_history.append(1 if np.any(row > 0) else 0)
+        tracking_ratio = np.mean(tracking_history) if tracking_history else 0.0
+        score = (
+            2.0 * tracking_score
+            - 1.5 * switch_penalty
+            + 1.0 * tracking_ratio
+        )
+        return score
 
     def _direction_score(self, obs, radar):
         """根据目标运动朝向与雷达方向的夹角打分"""
@@ -192,4 +224,3 @@ class BFSARHO:
         to_radar = radar.radar_position - np.array(obs['position'])
         cos_theta = np.dot(v, to_radar) / (np.linalg.norm(v) * np.linalg.norm(to_radar) + 1e-6)
         return cos_theta  # 越接近1越好
-        

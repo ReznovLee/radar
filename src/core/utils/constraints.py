@@ -29,7 +29,7 @@ class ConstraintChecker:
         :param radar_network:
         """
         self.radar_network = radar_network
-        self.radar_ids = list(radar_network.radars.key())
+        self.radar_ids = list(radar_network.radars.keys())
 
     @staticmethod
     def validate_input(assignment):
