@@ -17,6 +17,7 @@ data_directory = r"c:\Users\Reznov Lee\PycharmProjects\radar\output\scenario-202
 bfsa_file = os.path.join(data_directory, "bfsa_rho_assignment_history.json")
 rule_file = os.path.join(data_directory, "rule_based_assignment_history.json")
 
+
 def load_assignment_ratio(json_path):
     with open(json_path, 'r', encoding='utf-8') as f:
         data = json.load(f)
@@ -34,6 +35,7 @@ def load_assignment_ratio(json_path):
         timestamps.append(timestamp)
         ratios.append(ratio)
     return timestamps, ratios
+
 
 # 加载两种算法的分配比例
 bfsa_timestamps, bfsa_ratios = load_assignment_ratio(bfsa_file)
@@ -60,4 +62,3 @@ except Exception as e:
     print(f"保存图形时出错: {e}")
 
 plt.show()
-

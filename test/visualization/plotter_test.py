@@ -17,7 +17,7 @@ from src.visualization.plotter import RadarPlotter
 plotter = RadarPlotter(figsize=(14, 8))
 
 # 定义文件路径
-scenario_dir = "/Users/reznovlee/Desktop/git/radar/output/scenario-2025-04-28"
+scenario_dir = "./output/scenario-2025-04-28"
 bfsa_rho_file = os.path.join(scenario_dir, "bfsa_rho_assignment_history.json")
 rule_based_file = os.path.join(scenario_dir, "rule_based_assignment_history.json")
 output_dir = os.path.join(scenario_dir, "visualization")
