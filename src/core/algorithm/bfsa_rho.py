@@ -17,6 +17,7 @@ from src.core.utils.metrics import RadarPerformanceMetrics
 from src.core.utils.constraints import ConstraintChecker
 import logging
 
+
 class BFSARHO:
     """
     基于滚动时域优化的后向-前向-融合调度算法（BFSA-RHO）
@@ -73,13 +74,16 @@ class BFSARHO:
             for j, radar_id in enumerate(self.radar_ids):
                 radar = self.radar_network.radars[radar_id]
                 dist = np.linalg.norm(pos - radar.radar_position)
-                if dist < min_dist and radar.is_target_in_range(pos) and self.radar_network.is_radar_available(radar_id):
+                if dist < min_dist and radar.is_target_in_range(pos) and self.radar_network.is_radar_available(
+                        radar_id):
                     min_dist = dist
                     chosen_radar = j
             if chosen_radar is not None:
                 assignment[i, chosen_radar] = 1
         # 检查约束
-        if not self.constraint_checker.verify_all_constraints(assignment, [obs['position'] for obs in observed_targets])["all_satisfied"]:
+        if not \
+        self.constraint_checker.verify_all_constraints(assignment, [obs['position'] for obs in observed_targets])[
+            "all_satisfied"]:
             logging.warning("初始分配不满足约束，部分目标未分配。")
         return assignment
 
@@ -87,7 +91,8 @@ class BFSARHO:
         """历史加权分配，缺省部分未分配"""
         window = self.history[-self.window_size:]
         # 只保留shape一致的历史分配
-        valid_pairs = [(A, w) for A, w in zip(window, np.array([0.9 ** (len(window) - 1 - i) for i in range(len(window))]))
+        valid_pairs = [(A, w) for A, w in
+                       zip(window, np.array([0.9 ** (len(window) - 1 - i) for i in range(len(window))]))
                        if A.shape == (num_targets, num_radars)]
         if not valid_pairs:
             # 没有可用历史，返回全零分配
@@ -156,7 +161,9 @@ class BFSARHO:
                 assignment[i, :] = 0
                 assignment[i, best_j] = 1
             # 检查约束
-            if not self.constraint_checker.verify_all_constraints(assignment, [obs['position'] for obs in observed_targets])["all_satisfied"]:
+            if not \
+            self.constraint_checker.verify_all_constraints(assignment, [obs['position'] for obs in observed_targets])[
+                "all_satisfied"]:
                 assignment[i, :] = 0  # 不满足约束则取消分配
         return assignment
 
@@ -189,7 +196,9 @@ class BFSARHO:
                 if best_j is not None:
                     assignment[idx, best_j] = 1
                 # 检查约束
-                if not self.constraint_checker.verify_all_constraints(assignment, [obs['position'] for obs in observed_targets])["all_satisfied"]:
+                if not self.constraint_checker.verify_all_constraints(assignment,
+                                                                      [obs['position'] for obs in observed_targets])[
+                    "all_satisfied"]:
                     assignment[idx, :] = 0
         return assignment
 
@@ -210,9 +219,9 @@ class BFSARHO:
             tracking_history.append(1 if np.any(row > 0) else 0)
         tracking_ratio = np.mean(tracking_history) if tracking_history else 0.0
         score = (
-            2.0 * tracking_score
-            - 1.5 * switch_penalty
-            + 1.0 * tracking_ratio
+                2.0 * tracking_score
+                - 1.5 * switch_penalty
+                + 1.0 * tracking_ratio
         )
         return score
 
