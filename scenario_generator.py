@@ -63,7 +63,7 @@ def generate_radars():
     if num_radars <= 0:
         raise ValueError('The number of radars must be greater than 0.')
 
-    distribution_range = 1000 * radar_aggregation_rate
+    distribution_range = 100000 * radar_aggregation_rate
 
     radar_network_center = np.array([float(x.strip()) for x in radar_network_center_str.strip('()').split(',')])
 

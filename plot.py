@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: UTF-8 -*-
 """
-@Project ：BFSA
-@File    ：scenario_plot.py
+@Project ：radar
+@File    ：plot.py
 @IDE     ：PyCharm
 @Author  ：ReznovLee
 @Date    ：2025/2/5 15:30
@@ -81,12 +81,12 @@ def plot_scenario(radar_file: str, target_file: str, save_path: str = None):
     # 绘制雷达探测范围
     for radar in radar_data:
         ax.scatter(radar["x"], radar["y"], radar["z"], c='r', marker='^', label=f'Radar {radar["id"]}')
-        # 画一个球形表示雷达探测范围
-        u, v = np.mgrid[0:2 * np.pi:20j, 0:np.pi:10j]
+        # 以 (radar["x"], radar["y"], radar["z"]) 为球心的半球
+        u, v = np.mgrid[0:2 * np.pi:360j, 0:0.5 * np.pi:60j]
         x = radar["radius"] * np.cos(u) * np.sin(v) + radar["x"]
         y = radar["radius"] * np.sin(u) * np.sin(v) + radar["y"]
         z = radar["radius"] * np.cos(v) + radar["z"]
-        ax.plot_wireframe(x, y, z, color="gray", alpha=0.3)
+        ax.plot_wireframe(x, y, z, color="gray", alpha=0.1)
 
     # 绘制目标轨迹
     colors = plt.cm.jet(np.linspace(0, 1, len(target_data)))  # 给每个目标分配不同颜色
@@ -102,6 +102,28 @@ def plot_scenario(radar_file: str, target_file: str, save_path: str = None):
     ax.set_title("Scenario Visualization: Target Trajectories & Radar Coverage")
     ax.legend()
 
+    # 设置三维坐标轴等比例
+    def set_axes_equal(ax):
+        '''使3D坐标轴等比例'''
+        x_limits = ax.get_xlim3d()
+        y_limits = ax.get_ylim3d()
+        z_limits = ax.get_zlim3d()
+
+        x_range = abs(x_limits[1] - x_limits[0])
+        x_middle = np.mean(x_limits)
+        y_range = abs(y_limits[1] - y_limits[0])
+        y_middle = np.mean(y_limits)
+        z_range = abs(z_limits[1] - z_limits[0])
+        z_middle = np.mean(z_limits)
+
+        plot_radius = 0.5 * max([x_range, y_range, z_range])
+
+        ax.set_xlim3d([x_middle - plot_radius, x_middle + plot_radius])
+        ax.set_ylim3d([y_middle - plot_radius, y_middle + plot_radius])
+        ax.set_zlim3d([z_middle - plot_radius, z_middle + plot_radius])
+
+    set_axes_equal(ax)
+
     # 保存或显示图像
     if save_path:
         plt.show()
@@ -112,8 +134,8 @@ def plot_scenario(radar_file: str, target_file: str, save_path: str = None):
 
 
 if __name__ == "__main__":
-    radar_csv = "output/scenario-2025-04-28/5-radar.csv"
-    target_csv = "output/scenario-2025-04-28/10-targets.csv"
-    save_image = "output/scenario-2025-04-28/scenario_visualization.png"
+    radar_csv = "output/scenario-2025-05-12/5-radar.csv"
+    target_csv = "output/scenario-2025-05-12/10-targets.csv"
+    save_image = "output/scenario-2025-05-12/scenario_visualization.png"
 
     plot_scenario(radar_csv, target_csv, save_image)
