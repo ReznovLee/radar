@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 from matplotlib.colors import LinearSegmentedColormap
-from typing import List, Dict, Tuple, Any, Optional
+from typing import List, Dict, Tuple, Any, Optional  # 删除typing
 from scipy.sparse import csr_matrix
 import os
 import logging
@@ -57,62 +57,56 @@ class RadarPlotter:
         return fig, ax
     
     def plot_radar_gantt(self, 
-                         allocation_data: List[Dict[str, Any]], 
-                         time_range: Tuple[int, int],
-                         radar_info: Dict[str, int],
-                         target_info: Dict[str, Any],
-                         save_path: Optional[str] = None) -> None:
-        """
-        绘制雷达甘特图
-        
-        Args:
-            allocation_data: 分配结果数据，包含时间、雷达ID、通道ID、目标ID等信息
-            time_range: 时间范围 (开始时间, 结束时间)
-            radar_info: 雷达信息，包含雷达ID和通道数量
-            target_info: 目标信息，包含目标ID和其他属性
-            save_path: 保存路径，如果为None则显示图表
-        """
-        fig, ax = self._create_figure("雷达资源分配甘特图")
-        
+                         allocation_data, 
+                         time_range,
+                         radar_info,
+                         target_info,
+                         save_path=None):
+        fig, ax = self._create_figure("Radar resource allocation Gantt chart")
+
         # 准备Y轴标签和位置
         y_labels = []
         y_ticks = []
         current_y = 0
         radar_y_positions = {}
-        
+
         # 为每个雷达和通道分配Y轴位置
         for radar_id, channel_count in radar_info.items():
             radar_y_positions[radar_id] = {}
             for channel_id in range(channel_count):
-                y_labels.append(f"雷达{radar_id}-通道{channel_id}")
+                y_labels.append(f"Radar{radar_id}-Channel{channel_id}")
                 y_ticks.append(current_y)
                 radar_y_positions[radar_id][channel_id] = current_y
                 current_y += 1
-        
+
         # 设置Y轴
         ax.set_yticks(y_ticks)
         ax.set_yticklabels(y_labels)
-        
+
         # 设置X轴
         ax.set_xlim(time_range)
-        ax.set_xlabel("时间")
-        
+        ax.set_xlabel("Time")
+
         # 绘制分配结果
-        target_handles = []  # 用于图例
+        target_handles = {}  # 用于图例，确保所有目标都显示
+        for target_id in target_info.keys():
+            target_color_idx = int(target_id) % len(self.target_colors)
+            target_color = self.target_colors[target_color_idx]
+            # 创建一个不可见的bar用于图例
+            bar = ax.barh(-1, 0, color=target_color, alpha=0.8, edgecolor='black', linewidth=0.5)
+            target_handles[target_id] = bar
+
         drawn_targets = set()
-        
         for alloc in allocation_data:
             radar_id = alloc['radar_id']
             channel_id = alloc['channel_id']
             target_id = alloc['target_id']
             start_time = alloc['start_time']
             end_time = alloc['end_time']
-            
-            # 获取目标颜色
+
             target_color_idx = int(target_id) % len(self.target_colors)
             target_color = self.target_colors[target_color_idx]
-            
-            # 绘制分配块
+
             y_pos = radar_y_positions[radar_id][channel_id]
             rect = ax.barh(y_pos, 
                           width=end_time-start_time, 
@@ -122,9 +116,9 @@ class RadarPlotter:
                           alpha=0.8,
                           edgecolor='black',
                           linewidth=0.5)
-            
+
             # 添加目标ID标签
-            if (end_time - start_time) > (time_range[1] - time_range[0]) / 30:  # 只在足够宽的块上添加标签
+            if (end_time - start_time) > (time_range[1] - time_range[0]) / 30:
                 ax.text(start_time + (end_time - start_time) / 2, 
                        y_pos, 
                        f"T{target_id}", 
@@ -132,79 +126,62 @@ class RadarPlotter:
                        va='center',
                        fontsize=8,
                        color='black')
-            
-            # 为图例准备句柄
-            if target_id not in drawn_targets:
-                target_handles.append((rect, f"目标{target_id}"))
-                drawn_targets.add(target_id)
-        
-        # 添加图例
-        legend_elements = [h[0] for h in target_handles]
-        legend_labels = [h[1] for h in target_handles]
+            drawn_targets.add(target_id)
+
+        # 添加图例，确保所有目标都显示
+        legend_elements = [target_handles[tid][0] for tid in target_info.keys()]
+        legend_labels = [f"Target{tid}" for tid in target_info.keys()]
         ax.legend(legend_elements, legend_labels, loc='upper right', bbox_to_anchor=(1.15, 1))
-        
-        # 添加网格线
+
         ax.grid(True, axis='x', linestyle='--', alpha=0.7)
-        
-        # 调整布局
         plt.tight_layout()
-        
-        # 保存或显示图表
         if save_path:
             plt.savefig(save_path, bbox_inches='tight')
             plt.close()
         else:
             plt.show()
-    
+
     def plot_target_gantt(self, 
-                         allocation_data: List[Dict[str, Any]], 
-                         time_range: Tuple[int, int],
-                         target_info: Dict[str, Any],
-                         radar_info: Dict[str, int],
-                         save_path: Optional[str] = None) -> None:
-        """
-        绘制目标甘特图
-        
-        Args:
-            allocation_data: 分配结果数据，包含时间、雷达ID、通道ID、目标ID等信息
-            time_range: 时间范围 (开始时间, 结束时间)
-            target_info: 目标信息，包含目标ID和其他属性
-            radar_info: 雷达信息，包含雷达ID和通道数量
-            save_path: 保存路径，如果为None则显示图表
-        """
-        fig, ax = self._create_figure("目标跟踪分配甘特图")
-        
+                         allocation_data, 
+                         time_range,
+                         target_info,
+                         radar_info,
+                         save_path=None):
+        fig, ax = self._create_figure("Goal Tracking Assignment Gantt Chart")
+
         # 准备Y轴标签和位置
-        target_ids = sorted(list(set([t['target_id'] for t in allocation_data])))
-        y_labels = [f"目标{target_id}" for target_id in target_ids]
+        target_ids = sorted([str(tid) for tid in target_info.keys()])
+        y_labels = [f"Target{target_id}" for target_id in target_ids]
         y_ticks = list(range(len(target_ids)))
-        
-        # 创建目标ID到Y轴位置的映射
         target_y_positions = {target_id: i for i, target_id in enumerate(target_ids)}
-        
+
         # 设置Y轴
         ax.set_yticks(y_ticks)
         ax.set_yticklabels(y_labels)
-        
+
         # 设置X轴
         ax.set_xlim(time_range)
-        ax.set_xlabel("时间")
-        
+        ax.set_xlabel("Time")
+
         # 绘制分配结果
-        radar_handles = []  # 用于图例
-        drawn_radars = set()
-        
-        for alloc in allocation_data:
-            radar_id = alloc['radar_id']
-            target_id = alloc['target_id']
-            start_time = alloc['start_time']
-            end_time = alloc['end_time']
-            
-            # 获取雷达颜色
+        radar_handles = {}  # 用于图例，确保所有雷达都显示
+        for radar_id in radar_info.keys():
             radar_color_idx = int(radar_id) % len(self.radar_colors)
             radar_color = self.radar_colors[radar_color_idx]
-            
-            # 绘制分配块
+            # 创建一个不可见的bar用于图例
+            bar = ax.barh(-1, 0, color=radar_color, alpha=0.8, edgecolor='black', linewidth=0.5)
+            radar_handles[radar_id] = bar
+
+        drawn_radars = set()
+        for alloc in allocation_data:
+            radar_id = alloc['radar_id']
+            target_id = str(alloc['target_id'])
+            start_time = alloc['start_time']
+            end_time = alloc['end_time']
+
+            radar_color_idx = int(radar_id) % len(self.radar_colors)
+            radar_color = self.radar_colors[radar_color_idx]
+
             y_pos = target_y_positions[target_id]
             rect = ax.barh(y_pos, 
                           width=end_time-start_time, 
@@ -214,9 +191,9 @@ class RadarPlotter:
                           alpha=0.8,
                           edgecolor='black',
                           linewidth=0.5)
-            
+
             # 添加雷达ID标签
-            if (end_time - start_time) > (time_range[1] - time_range[0]) / 30:  # 只在足够宽的块上添加标签
+            if (end_time - start_time) > (time_range[1] - time_range[0]) / 30:
                 ax.text(start_time + (end_time - start_time) / 2, 
                        y_pos, 
                        f"R{radar_id}", 
@@ -224,30 +201,21 @@ class RadarPlotter:
                        va='center',
                        fontsize=8,
                        color='black')
-            
-            # 为图例准备句柄
-            if radar_id not in drawn_radars:
-                radar_handles.append((rect, f"雷达{radar_id}"))
-                drawn_radars.add(radar_id)
-        
-        # 添加图例
-        legend_elements = [h[0] for h in radar_handles]
-        legend_labels = [h[1] for h in radar_handles]
+            drawn_radars.add(radar_id)
+
+        # 添加图例，确保所有雷达都显示
+        legend_elements = [radar_handles[rid][0] for rid in radar_info.keys()]
+        legend_labels = [f"Radar{rid}" for rid in radar_info.keys()]
         ax.legend(legend_elements, legend_labels, loc='upper right', bbox_to_anchor=(1.15, 1))
-        
-        # 添加网格线
+
         ax.grid(True, axis='x', linestyle='--', alpha=0.7)
-        
-        # 调整布局
         plt.tight_layout()
-        
-        # 保存或显示图表
         if save_path:
             plt.savefig(save_path, bbox_inches='tight')
             plt.close()
         else:
             plt.show()
-    
+
     def plot_gantt_chart(self, 
                         assignments: List[csr_matrix], 
                         time_steps: List[int], 
@@ -267,15 +235,15 @@ class RadarPlotter:
 
         if mode == "target":
             plt.imshow(assignment_matrix.argmax(axis=2), cmap='tab10', aspect='auto')
-            plt.ylabel('目标ID')
-            plt.title('目标调度甘特图')
+            plt.ylabel('Target ID')
+            plt.title('Target Scheduling Gantt Chart')
         elif mode == "radar":
             plt.imshow(assignment_matrix.argmax(axis=1).T, cmap='tab10', aspect='auto')
-            plt.ylabel('雷达ID')
-            plt.title('雷达调度甘特图')
+            plt.ylabel('Radar ID')
+            plt.title('Radar Scheduling Gantt Chart')
 
-        plt.xlabel('时间步')
-        plt.colorbar(label="分配")
+        plt.xlabel('Timestep')
+        plt.colorbar(label="Assignment")
         
         # 保存或显示图表
         self._save_or_show(save_path)
@@ -287,9 +255,9 @@ class RadarPlotter:
                 # 确保目录存在
                 os.makedirs(os.path.dirname(save_path), exist_ok=True)
                 plt.savefig(save_path, bbox_inches='tight', dpi=300)
-                logging.info(f"已保存图表到 {save_path}")
+                logging.info(f"Result have been saved to {save_path}")
             except Exception as e:
-                logging.error(f"保存图表到 {save_path} 失败: {e}")
+                logging.error(f"Result saved to {save_path} falied: {e}")
             finally:
                 plt.close()
         else:
@@ -309,7 +277,7 @@ class RadarPlotter:
             algorithm_name: 算法名称
             save_path: 保存路径，如果为None则显示图表
         """
-        fig, ax = self._create_figure(f"目标雷达切换频次 - {algorithm_name}")
+        fig, ax = self._create_figure(f"Target radar switching frequency - {algorithm_name}")
         
         # 计算每个目标的雷达切换次数
         target_switches = {}
@@ -335,7 +303,7 @@ class RadarPlotter:
         target_ids = sorted(target_switches.keys())
         switch_counts = [target_switches[tid] for tid in target_ids]
         
-        bars = ax.bar([f"目标{tid}" for tid in target_ids], switch_counts, color='skyblue', edgecolor='navy')
+        bars = ax.bar([f"Target {tid}" for tid in target_ids], switch_counts, color='skyblue', edgecolor='navy')
         
         # 添加数值标签
         for bar, count in zip(bars, switch_counts):
@@ -345,13 +313,13 @@ class RadarPlotter:
                    ha='center', va='bottom')
         
         # 设置坐标轴标签
-        ax.set_xlabel('目标')
-        ax.set_ylabel('雷达切换次数')
+        ax.set_xlabel('Targets')
+        ax.set_ylabel('Radar switch counts')
         
         # 添加平均切换次数线
         avg_switches = np.mean(list(target_switches.values()))
         ax.axhline(y=avg_switches, color='red', linestyle='--', alpha=0.7)
-        ax.text(len(target_ids) - 0.5, avg_switches + 0.2, f'平均: {avg_switches:.2f}', color='red')
+        ax.text(len(target_ids) - 0.5, avg_switches + 0.2, f'avarage: {avg_switches:.2f}', color='red')
         
         # 调整布局
         plt.tight_layout()
@@ -373,7 +341,7 @@ class RadarPlotter:
             convergence_data: 收敛数据，格式为 {算法名称: [迭代1的目标函数值, 迭代2的目标函数值, ...]}
             save_path: 保存路径，如果为None则显示图表
         """
-        fig, ax = self._create_figure("算法收敛曲线对比")
+        fig, ax = self._create_figure("Comparison of algorithm convergence curves")
         
         # 绘制每个算法的收敛曲线
         for i, (algorithm, values) in enumerate(convergence_data.items()):
@@ -382,8 +350,8 @@ class RadarPlotter:
                    color=plt.cm.tab10.colors[i % 10], linewidth=2)
         
         # 设置坐标轴标签
-        ax.set_xlabel('迭代次数')
-        ax.set_ylabel('跟踪覆盖率 (跟踪时长/目标在辐射范围总时长)')
+        ax.set_xlabel('Iterations')
+        ax.set_ylabel('Tracking coverage (tracking time/total time the target is in the radiation range)')
         
         # 设置Y轴范围，从0到1或略高于最大值
         max_value = max([max(values) for values in convergence_data.values()])
@@ -407,7 +375,7 @@ class RadarPlotter:
     
     def plot_boxplot(self, 
                     performance_data: Dict[str, List[float]],
-                    metric_name: str = "跟踪覆盖率",
+                    metric_name: str = "Tracking coverage",
                     save_path: Optional[str] = None) -> None:
         """
         绘制箱线图比较不同算法的性能
@@ -417,7 +385,7 @@ class RadarPlotter:
             metric_name: 性能指标名称
             save_path: 保存路径，如果为None则显示图表
         """
-        fig, ax = self._create_figure(f"算法性能箱线图 - {metric_name}")
+        fig, ax = self._create_figure(f"Algorithm performance box plot - {metric_name}")
         
         # 准备数据
         data = []
@@ -435,7 +403,7 @@ class RadarPlotter:
             box.set(facecolor=plt.cm.tab10.colors[i % 10], alpha=0.7)
         
         # 设置坐标轴标签
-        ax.set_xlabel('算法')
+        ax.set_xlabel('Algorithm')
         ax.set_ylabel(metric_name)
         
         # 添加网格
@@ -495,7 +463,7 @@ class RadarPlotter:
         ax.legend(loc='upper right', bbox_to_anchor=(0.1, 0.1))
         
         # 设置标题
-        plt.title("算法综合性能对比", size=15, y=1.1)
+        plt.title("Comparison of comprehensive performance of algorithms", size=15, y=1.1)
         
         # 调整布局
         plt.tight_layout()

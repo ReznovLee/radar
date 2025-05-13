@@ -58,15 +58,8 @@ class Radar:
         """
         return any(channel is None for channel in self.radar_channels.values())
 
-    def assign_channel(self, target_id):
-        """ Assign the current destination to one of the channels of the current ID
-
-        A certain channel corresponding to the radar is assigned to the target, and the corresponding channel of
-        the radar is randomly modified with the flag
-
-        :param target_id: Target ID
-        :return: radar channel -> int
-        """
+    def allocate_channel(self, target_id):
+        """Assign the current destination to one of the channels of the current ID"""
         for channel_id in range(self.num_channels):
             if self.radar_channels[channel_id] is None:
                 self.radar_channels[channel_id] = target_id

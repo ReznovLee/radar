@@ -11,9 +11,10 @@
 import numpy as np
 import pandas as pd
 import os
-import logging # 引入日志记录
+import logging  # 引入日志记录
 
-from src.core.models.radar_model import Radar, RadarNetwork
+from src.core.models.radar_model import RadarNetwork
+
 
 class RuleBasedScheduler:
     """
@@ -58,7 +59,7 @@ class RuleBasedScheduler:
 
         try:
             self.data = pd.read_csv(data_path)
-            # 确保必要的列存在
+            # 确保必要列存在
             required_cols = ['id', 'timestep', 'position_x', 'position_y', 'position_z']
             if not all(col in self.data.columns for col in required_cols):
                 raise ValueError(f"CSV文件 '{data_path}' 必须包含以下列: {required_cols}")
@@ -74,7 +75,6 @@ class RuleBasedScheduler:
         self.timestamps = sorted(self.data['timestep'].unique())
         if not self.timestamps:
             logging.warning(f"数据文件 '{data_path}' 中未找到有效的时间戳。")
-
 
     def _add_measurement_noise(self, true_position):
         """
@@ -117,8 +117,9 @@ class RuleBasedScheduler:
                 ], dtype=np.float64)
                 target_list.append({'id': row['id'], 'true_position': position})
             except (ValueError, TypeError) as e:
-                logging.warning(f"在时间戳 {timestamp} 处理目标 {row.get('id', 'N/A')} 的位置数据时出错: {e}。跳过此目标。")
-                continue # 跳过数据格式错误的目标
+                logging.warning(
+                    f"在时间戳 {timestamp} 处理目标 {row.get('id', 'N/A')} 的位置数据时出错: {e}。跳过此目标。")
+                continue  # 跳过数据格式错误的目标
         return target_list
 
     def run_simulation(self):
@@ -131,7 +132,7 @@ class RuleBasedScheduler:
             list: 包含所有时间步分配结果的历史记录列表。
                   格式: [{'timestamp': t1, 'assignments': {tgt_id: rdr_id/None, ...}}, ...]
         """
-        self.assignment_history = [] # 清空历史记录以防重复运行
+        self.assignment_history = []  # 清空历史记录以防重复运行
 
         if not self.timestamps:
             logging.warning("没有时间戳可供模拟。")
@@ -144,10 +145,10 @@ class RuleBasedScheduler:
             try:
                 self.radar_network.reset_all_channels()
             except AttributeError:
-                 logging.error("RadarNetwork 对象缺少 'reset_all_channels' 方法。无法重置通道状态。")
-                 # 根据需要决定是否在此处停止模拟或继续（可能导致通道一直被占用）
-                 # raise NotImplementedError("RadarNetwork 需要实现 reset_all_channels 方法")
-                 pass # 暂时允许继续，但会有警告
+                logging.error("RadarNetwork 对象缺少 'reset_all_channels' 方法。无法重置通道状态。")
+                # 根据需要决定是否在此处停止模拟或继续（可能导致通道一直被占用）
+                # raise NotImplementedError("RadarNetwork 需要实现 reset_all_channels 方法")
+                pass  # 暂时允许继续，但会有警告
 
             # 2. 获取当前时间戳的目标及其真实位置
             current_targets = self._get_targets_at_timestamp(timestamp)
@@ -160,7 +161,7 @@ class RuleBasedScheduler:
                 })
                 continue
 
-            assignments_this_step = {} # 存储当前时间步的分配结果 {target_id: radar_id or None}
+            assignments_this_step = {}  # 存储当前时间步的分配结果 {target_id: radar_id or None}
 
             # 3. 遍历目标进行分配
             for target in current_targets:
@@ -175,44 +176,45 @@ class RuleBasedScheduler:
                     covering_radars = self.radar_network.find_covering_radars(observed_position)
                 except AttributeError:
                     logging.error("RadarNetwork 对象缺少 'find_covering_radars' 方法。无法查找覆盖雷达。")
-                    covering_radars = [] # 无法查找，假设没有覆盖
+                    covering_radars = []  # 无法查找，假设没有覆盖
                     # raise NotImplementedError("RadarNetwork 需要实现 find_covering_radars 方法")
 
-                assigned_to_radar_id = None # 默认未分配
+                assigned_to_radar_id = None  # 默认未分配
                 if covering_radars:
                     # 3d. 按距离排序 (基于观测位置到雷达位置的距离)
                     try:
                         # --- 修改点 1：使用 radar_position ---
                         # covering_radars.sort(key=lambda r: np.linalg.norm(observed_position - r.position)) # 原代码
-                        covering_radars.sort(key=lambda r: np.linalg.norm(observed_position - r.radar_position)) # 修改后
+                        covering_radars.sort(key=lambda r: np.linalg.norm(observed_position - r.radar_position))  # 修改后
                         # --- 修改结束 ---
                     except AttributeError as e:
-                         logging.error(f"排序覆盖雷达时出错: 雷达对象可能缺少 'radar_position' 属性。 {e}") # 更新错误消息
-                         pass
+                        logging.error(f"排序覆盖雷达时出错: 雷达对象可能缺少 'radar_position' 属性。 {e}")  # 更新错误消息
+                        pass
 
                     # 3e. 尝试分配给最近的可用雷达
                     for radar in covering_radars:
                         try:
                             # --- 修改点 2：使用 assign_channel ---
                             # if radar.allocate_channel(target_id): # 原代码
-                            if radar.assign_channel(target_id): # 修改后
-                            # --- 修改结束 ---
-                                assigned_to_radar_id = radar.radar_id # radar_id 名称是正确的
+                            if radar.assign_channel(target_id):  # 修改后
+                                # --- 修改结束 ---
+                                assigned_to_radar_id = radar.radar_id  # radar_id 名称是正确的
                                 logging.debug(f"时间戳 {timestamp}: 目标 {target_id} 分配给雷达 {assigned_to_radar_id}")
-                                break # 分配成功，处理下一个目标
+                                break  # 分配成功，处理下一个目标
                         except AttributeError as e:
                             # 更新错误消息以反映实际尝试的方法名
-                            logging.error(f"尝试分配通道时出错: 雷达对象可能缺少 'assign_channel' 或 'radar_id' 属性。 {e}")
+                            logging.error(
+                                f"尝试分配通道时出错: 雷达对象可能缺少 'assign_channel' 或 'radar_id' 属性。 {e}")
                             continue
                         except Exception as e:
-                            logging.error(f"分配雷达 {getattr(radar, 'radar_id', 'N/A')} 给目标 {target_id} 时发生意外错误: {e}")
+                            logging.error(
+                                f"分配雷达 {getattr(radar, 'radar_id', 'N/A')} 给目标 {target_id} 时发生意外错误: {e}")
                             continue
 
                 # 记录此目标的分配结果
                 assignments_this_step[target_id] = assigned_to_radar_id
                 if assigned_to_radar_id is None:
                     logging.debug(f"时间戳 {timestamp}: 目标 {target_id} 未能分配到雷达。")
-
 
             # 4. 记录当前时间步的完整分配结果
             self.assignment_history.append({
@@ -229,6 +231,6 @@ class RuleBasedScheduler:
         返回模拟过程中记录的完整分配历史。
 
         Returns:
-            list: 包含所有时间步分配结果的历史记录列表。
+            list: 包含所有时间步的分配结果的历史记录列表。
         """
         return self.assignment_history

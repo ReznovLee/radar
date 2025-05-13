@@ -1,10 +1,10 @@
 # 场景配置文件
 
 # 雷达数量
-num_radars: 5
+num_radars: 10
 
 # 目标数量
-num_targets: 10
+num_targets: 100
 
 # 雷达聚集率
 radar_aggregation_rate: 0.6
