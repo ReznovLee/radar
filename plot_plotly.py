@@ -11,18 +11,18 @@
 import csv
 import numpy as np
 import plotly.graph_objs as go
-# from typing import List, Dict   # 删除此行
+
 
 
 # 读取 CSV 文件
-def load_csv(file_path):   # 删除类型声明
+def load_csv(file_path):
     with open(file_path, "r") as file:
         reader = csv.DictReader(file)
         return [row for row in reader]
 
 
 # 解析雷达数据
-def process_radar_data(radar_data):   # 删除类型声明
+def process_radar_data(radar_data):
     radars = []
     for row in radar_data:
         radars.append({
@@ -37,7 +37,7 @@ def process_radar_data(radar_data):   # 删除类型声明
 
 
 # 解析目标数据
-def process_target_data(target_data):   # 删除类型声明
+def process_target_data(target_data):
     targets = {}
     for row in target_data:
         target_id = int(row["id"])
