@@ -16,7 +16,7 @@ import pandas as pd
 
 from core.models.radar_model import Radar, RadarNetwork
 from core.algorithm.bfsa_rho import BFSARHO
-from core.algorithm.rule_based import RuleBasedScheduler
+# from core.algorithm.rule_based import RuleBasedScheduler  # Modify
 
 
 def load_yaml_config(config_path):
@@ -74,6 +74,10 @@ def run_simulation(algorithm_name, algorithm_class, radar_network, targets_by_ti
     assignment_history = []
     # 初始化每部雷达的通道占用情况
     radar_channel_state = {rid: [None] * radar_network.radars[rid].num_channels for rid in radar_network.radars}
+    
+    # 将算法初始化移到循环外部
+    algorithm = algorithm_class(radar_network)
+    
     for t in range(total_time + 1):
         targets = targets_by_timestep.get(t, [])
         observed_targets = []
@@ -85,8 +89,8 @@ def run_simulation(algorithm_name, algorithm_class, radar_network, targets_by_ti
                 'target_type': target['target_type'],
                 'priority': target['priority']
             })
-        if t == 0:
-            algorithm = algorithm_class(radar_network)
+        
+        # 删除条件判断，因为算法已经在循环外初始化
         assignment_matrix = algorithm.solve(targets, observed_targets, t)
         assignments = {}
         channel_assignments = {}
@@ -123,7 +127,8 @@ def run_simulation(algorithm_name, algorithm_class, radar_network, targets_by_ti
 
 
 def main():
-    config_path = os.path.join("data\\config\\param_config.yaml")  # 'data', 'config', 'param_config.yaml'
+    # config_path = os.path.join("data\\config\\param_config.yaml")  # windows
+    config_path = os.path.join('data', 'config', 'param_config.yaml')  # linux
     radar_csv_path = os.path.join('..', 'output', 'scenario-2025-05-13', '10-radar.csv')
     target_csv_path = os.path.join('..', 'output', 'scenario-2025-05-13', '100-targets.csv')
     output_dir = os.path.join('..', 'output', 'scenario-2025-05-13')

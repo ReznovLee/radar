@@ -13,7 +13,7 @@ import pandas as pd
 import os
 import logging  # 引入日志记录
 
-from src.core.models.radar_model import RadarNetwork
+from core.models.radar_model import RadarNetwork
 
 
 class RuleBasedScheduler:

@@ -9,7 +9,7 @@
 """
 import numpy as np
 from scipy import sparse
-from src.core.models.radar_model import RadarNetwork
+from core.models.radar_model import RadarNetwork
 
 
 class ConstraintChecker:
