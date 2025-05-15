@@ -57,86 +57,85 @@ class RadarPlotter:
         return fig, ax
     
     def plot_radar_gantt(self, 
-                         allocation_data, 
-                         time_range,
-                         radar_info,
-                         target_info,
-                         save_path=None):
-        fig, ax = self._create_figure("Radar resource allocation Gantt chart")
-
+                     allocation_data, 
+                     time_range,
+                     radar_info,
+                     target_info,
+                     save_path=None):
+        fig, ax = self._create_figure("雷达资源分配甘特图")
+    
         # 准备Y轴标签和位置
         y_labels = []
         y_ticks = []
         current_y = 0
         radar_y_positions = {}
-
+    
         # 为每个雷达和通道分配Y轴位置
         for radar_id, channel_count in radar_info.items():
             radar_y_positions[radar_id] = {}
             for channel_id in range(channel_count):
-                y_labels.append(f"Radar{radar_id}-Channel{channel_id}")
+                y_labels.append(f"R{radar_id}-C{channel_id}")  # 简化标签
                 y_ticks.append(current_y)
                 radar_y_positions[radar_id][channel_id] = current_y
                 current_y += 1
-
+    
         # 设置Y轴
         ax.set_yticks(y_ticks)
         ax.set_yticklabels(y_labels)
-
+    
         # 设置X轴
         ax.set_xlim(time_range)
-        ax.set_xlabel("Time")
-
+        ax.set_xlabel("时间")
+    
         # 绘制分配结果
-        target_handles = {}  # 用于图例，确保所有目标都显示
+        target_handles = {}
         for target_id in target_info.keys():
             target_color_idx = int(target_id) % len(self.target_colors)
             target_color = self.target_colors[target_color_idx]
-            # 创建一个不可见的bar用于图例
             bar = ax.barh(-1, 0, color=target_color, alpha=0.8, edgecolor='black', linewidth=0.5)
             target_handles[target_id] = bar
-
+    
         drawn_targets = set()
         for alloc in allocation_data:
-            radar_id = alloc['radar_id']
-            channel_id = alloc['channel_id']
-            target_id = alloc['target_id']
-            start_time = alloc['start_time']
-            end_time = alloc['end_time']
-
-            target_color_idx = int(target_id) % len(self.target_colors)
-            target_color = self.target_colors[target_color_idx]
-
-            y_pos = radar_y_positions[radar_id][channel_id]
-            rect = ax.barh(y_pos, 
-                          width=end_time-start_time, 
-                          left=start_time, 
-                          height=0.8, 
-                          color=target_color, 
-                          alpha=0.8,
-                          edgecolor='black',
-                          linewidth=0.5)
-
-            # 添加目标ID标签
-            if (end_time - start_time) > (time_range[1] - time_range[0]) / 30:
-                ax.text(start_time + (end_time - start_time) / 2, 
-                       y_pos, 
-                       f"T{target_id}", 
-                       ha='center', 
-                       va='center',
-                       fontsize=8,
-                       color='black')
-            drawn_targets.add(target_id)
-
-        # 添加图例，确保所有目标都显示
-        legend_elements = [target_handles[tid][0] for tid in target_info.keys()]
-        legend_labels = [f"Target{tid}" for tid in target_info.keys()]
-        ax.legend(legend_elements, legend_labels, loc='upper right', bbox_to_anchor=(1.15, 1))
-
+            timestamp = alloc['timestamp']
+            assignments = alloc['assignments']
+            
+            for target_id, assignment in assignments.items():
+                if assignment['radar_id'] is not None:
+                    radar_id = assignment['radar_id']
+                    channel_id = assignment['channel_id']
+                    target_color_idx = int(target_id) % len(self.target_colors)
+                    target_color = self.target_colors[target_color_idx]
+                    
+                    y_pos = radar_y_positions[radar_id][channel_id]
+                    ax.barh(y_pos, 
+                           width=1,  # 每个时间步长度为1
+                           left=timestamp,
+                           height=0.8, 
+                           color=target_color, 
+                           alpha=0.8,
+                           edgecolor='black',
+                           linewidth=0.5)
+                    drawn_targets.add(target_id)
+    
+        # 添加简化的图例
+        if len(target_handles) > 20:  # 如果目标数量过多，只显示部分图例
+            selected_targets = sorted(target_handles.keys())[:20]  # 选择前20个目标
+            legend_elements = [target_handles[tid][0] for tid in selected_targets]
+            legend_labels = [f"T{tid}" for tid in selected_targets]
+            legend_labels.append("...")  # 添加省略号表示还有更多目标
+        else:
+            legend_elements = [target_handles[tid][0] for tid in target_handles.keys()]
+            legend_labels = [f"T{tid}" for tid in target_handles.keys()]
+    
+        ax.legend(legend_elements, legend_labels, loc='center left', bbox_to_anchor=(1.01, 0.5),
+                 ncol=max(1, len(legend_labels)//20))  # 根据数量调整图例列数
+    
         ax.grid(True, axis='x', linestyle='--', alpha=0.7)
         plt.tight_layout()
+        
         if save_path:
-            plt.savefig(save_path, bbox_inches='tight')
+            plt.savefig(save_path, bbox_inches='tight', dpi=300)
             plt.close()
         else:
             plt.show()

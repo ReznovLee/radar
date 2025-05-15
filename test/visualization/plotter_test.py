@@ -17,9 +17,9 @@ from src.visualization.plotter import RadarPlotter
 plotter = RadarPlotter(figsize=(14, 8))
 
 # 定义文件路径
-scenario_dir = "./output/scenario-2025-05-13"
+scenario_dir = "scenario-2025-05-15"
 bfsa_rho_file = os.path.join(scenario_dir, "bfsa_rho_assignment_history.json")
-# rule_based_file = os.path.join(scenario_dir, "rule_based_assignment_history.json")
+rule_based_file = os.path.join(scenario_dir, "rule_based_assignment_history.json")
 output_dir = os.path.join(scenario_dir, "visualization")
 
 # 创建输出目录
@@ -33,7 +33,7 @@ def load_assignment_history(file_path):
 
 
 bfsa_rho_history = load_assignment_history(bfsa_rho_file)
-# rule_based_history = load_assignment_history(rule_based_file)
+rule_based_history = load_assignment_history(rule_based_file)
 
 
 # 提取雷达和目标信息
@@ -50,22 +50,32 @@ def extract_info(history):
 
 
 bfsa_radars, bfsa_targets = extract_info(bfsa_rho_history)
-# rule_radars, rule_targets = extract_info(rule_based_history)
+rule_radars, rule_targets = extract_info(rule_based_history)
 
 # 合并雷达和目标信息
-# all_radars = bfsa_radars.union(rule_radars)
-# all_targets = bfsa_targets.union(rule_targets)
+all_radars = bfsa_radars.union(rule_radars)
+all_targets = bfsa_targets.union(rule_targets)
 
 # 构建雷达信息字典 (假设每个雷达有2个通道)
 # 动态统计每个雷达实际用到的最大通道号，确保不会KeyError
+# 构建雷达信息字典
 radar_info = {}
-for radar_id in bfsa_radars:
+for radar_id in all_radars:  # 使用 all_radars 而不是 bfsa_radars
     max_channel_id = -1
+    # 检查 BFSA-RHO 的历史数据
     for record in bfsa_rho_history:
         for _, assignment in record["assignments"].items():
             if assignment is not None and assignment["radar_id"] == radar_id and assignment["channel_id"] is not None:
                 if assignment["channel_id"] > max_channel_id:
                     max_channel_id = assignment["channel_id"]
+    
+    # 检查 Rule-Based 的历史数据
+    for record in rule_based_history:
+        for _, assignment in record["assignments"].items():
+            if assignment is not None and assignment["radar_id"] == radar_id and assignment["channel_id"] is not None:
+                if assignment["channel_id"] > max_channel_id:
+                    max_channel_id = assignment["channel_id"]
+    
     # 设置通道数为最大通道号+1（如果没有分配则为1）
     radar_info[radar_id] = max_channel_id + 1 if max_channel_id >= 0 else 1
 
@@ -113,7 +123,7 @@ def convert_to_gantt_data(history):
 
 
 bfsa_gantt_data = convert_to_gantt_data(bfsa_rho_history)
-# rule_gantt_data = convert_to_gantt_data(rule_based_history)
+rule_gantt_data = convert_to_gantt_data(rule_based_history)
 
 
 # 计算目标切换次数
@@ -144,7 +154,7 @@ def calculate_switches(gantt_data):
 
 
 bfsa_switches = calculate_switches(bfsa_gantt_data)
-# rule_switches = calculate_switches(rule_gantt_data)
+rule_switches = calculate_switches(rule_gantt_data)
 
 
 # 生成收敛曲线数据 (模拟数据)
@@ -152,15 +162,15 @@ def generate_convergence_data():
     # 这里使用模拟数据，实际应用中应该从算法运行过程中收集
     iterations = 20
     bfsa_values = [0.3]
-    # rule_values = [0.2]
+    rule_values = [0.2]
 
     for i in range(1, iterations):
         bfsa_values.append(min(0.85, bfsa_values[-1] + 0.5 / (i + 2)))
-        # rule_values.append(min(0.75, rule_values[-1] + 0.4 / (i + 2)))
+        rule_values.append(min(0.75, rule_values[-1] + 0.4 / (i + 2)))
 
     return {
         "BFSA-Rho": bfsa_values,
-        # "Rule-Based": rule_values
+        "Rule-Based": rule_values
     }
 
 
@@ -174,11 +184,11 @@ def generate_performance_data():
     np.random.seed(42)  # 设置随机种子以确保可重复性
 
     bfsa_perf = np.random.normal(0.82, 0.02, runs)
-    # rule_perf = np.random.normal(0.74, 0.03, runs)
+    rule_perf = np.random.normal(0.74, 0.03, runs)
 
     return {
         "BFSA-Rho": bfsa_perf.tolist(),
-        # "Rule-Based": rule_perf.tolist()
+        "Rule-Based": rule_perf.tolist()
     }
 
 
@@ -194,7 +204,7 @@ plotter.plot_radar_gantt(
     save_path=os.path.join(output_dir, "bfsa_rho_radar_gantt.png")
 )
 
-"""
+
 # 2. Rule-Based 雷达甘特图
 plotter.plot_radar_gantt(
     rule_gantt_data,
@@ -203,7 +213,7 @@ plotter.plot_radar_gantt(
     target_info,
     save_path=os.path.join(output_dir, "rule_based_radar_gantt.png")
 )
-"""
+
 
 # 3. BFSA-Rho 目标甘特图
 plotter.plot_target_gantt(
@@ -214,7 +224,7 @@ plotter.plot_target_gantt(
     save_path=os.path.join(output_dir, "bfsa_rho_target_gantt.png")
 )
 
-"""
+
 # 4. Rule-Based 目标甘特图
 plotter.plot_target_gantt(
     rule_gantt_data,
@@ -223,7 +233,7 @@ plotter.plot_target_gantt(
     radar_info,
     save_path=os.path.join(output_dir, "rule_based_target_gantt.png")
 )
-"""
+
 
 # 5. 目标切换频次对比图
 # 将两个算法的切换数据合并为一个格式

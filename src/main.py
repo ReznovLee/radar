@@ -13,18 +13,34 @@ import yaml
 import json
 import numpy as np
 import pandas as pd
+import platform
 
 from core.models.radar_model import Radar, RadarNetwork
 from core.algorithm.bfsa_rho import BFSARHO
-# from core.algorithm.rule_based import RuleBasedScheduler  # Modify
+from core.algorithm.rule_based import RuleBasedScheduler  # Modify
+from src.visualization.plotter import RadarPlotter
 
 
 def load_yaml_config(config_path):
+    """ Load the YAML config file
+
+    Load parameters from the YAML config file
+
+    :param config_path: path to the YAML config file
+    :return config: loaded YAML config file
+    """
     with open(config_path, 'r', encoding='utf-8') as f:
         return yaml.safe_load(f)
 
 
 def load_radar_csv(radar_csv_path):
+    """ Load radar csv file
+
+    Load radar csv file
+
+    :param radar_csv_path: path to radar csv file
+    :return radar: loaded radar csv file
+    """
     df = pd.read_csv(radar_csv_path)
     radar_dict = {}
     for _, row in df.iterrows():
@@ -40,6 +56,13 @@ def load_radar_csv(radar_csv_path):
 
 
 def load_targets_csv(target_csv_path):
+    """ Load targe csv file
+
+    Load the target csv file with all targets info by timestep
+
+    :param target_csv_path: path to the target csv file
+    :return targets: loaded target csv file
+    """
     df = pd.read_csv(target_csv_path)
     targets_by_timestep = {}
     for _, row in df.iterrows():
@@ -57,6 +80,13 @@ def load_targets_csv(target_csv_path):
 
 
 def build_radar_network(radar_dict):
+    """ Build radar network
+
+    Using Radar class builds radar network
+
+    :param radar_dict: radar dict from radar_dict
+    :return radar_network: radar network
+    """
     radars = {}
     for radar_id, info in radar_dict.items():
         radar = Radar(
@@ -70,14 +100,14 @@ def build_radar_network(radar_dict):
     return radar_network
 
 
-def run_simulation(algorithm_name, algorithm_class, radar_network, targets_by_timestep, total_time, output_json_path):
+def run_simulation(algorithm_class,
+                   radar_network,
+                   targets_by_timestep,
+                   total_time,
+                   output_json_path):
     assignment_history = []
-    # 初始化每部雷达的通道占用情况
     radar_channel_state = {rid: [None] * radar_network.radars[rid].num_channels for rid in radar_network.radars}
-    
-    # 将算法初始化移到循环外部
     algorithm = algorithm_class(radar_network)
-    
     for t in range(total_time + 1):
         targets = targets_by_timestep.get(t, [])
         observed_targets = []
@@ -89,12 +119,8 @@ def run_simulation(algorithm_name, algorithm_class, radar_network, targets_by_ti
                 'target_type': target['target_type'],
                 'priority': target['priority']
             })
-        
-        # 删除条件判断，因为算法已经在循环外初始化
         assignment_matrix = algorithm.solve(targets, observed_targets, t)
         assignments = {}
-        channel_assignments = {}
-        # 重置通道占用
         for rid in radar_channel_state:
             radar_channel_state[rid] = [None] * radar_network.radars[rid].num_channels
         if assignment_matrix is not None:
@@ -104,7 +130,6 @@ def run_simulation(algorithm_name, algorithm_class, radar_network, targets_by_ti
                 assigned_channel = None
                 if np.any(row > 0):
                     assigned_radar = radar_network.radar_ids[np.argmax(row)]
-                    # 分配空闲通道（简单轮询）
                     channels = radar_channel_state[assigned_radar]
                     for ch_idx in range(len(channels)):
                         if channels[ch_idx] is None:
@@ -112,7 +137,6 @@ def run_simulation(algorithm_name, algorithm_class, radar_network, targets_by_ti
                             channels[ch_idx] = target['id']
                             break
                     if assigned_channel is None:
-                        # 所有通道被占用，分配失败
                         assigned_radar = None
                 assignments[str(target['id'])] = {
                     "radar_id": assigned_radar,
@@ -127,11 +151,15 @@ def run_simulation(algorithm_name, algorithm_class, radar_network, targets_by_ti
 
 
 def main():
-    # config_path = os.path.join("data\\config\\param_config.yaml")  # windows
-    config_path = os.path.join('data', 'config', 'param_config.yaml')  # linux
+    if platform.system() == 'Windows':
+        config_path = os.path.join("data\\config\\param_config.yaml")  # windows
+        data_dir = "data"
+    else:
+        config_path = os.path.join('data', 'config', 'param_config.yaml')  # linux
+        data_dir = "data"
     radar_csv_path = os.path.join('..', 'output', 'scenario-2025-05-13', '10-radar.csv')
     target_csv_path = os.path.join('..', 'output', 'scenario-2025-05-13', '100-targets.csv')
-    output_dir = os.path.join('..', 'output', 'scenario-2025-05-13')
+    output_dir = os.path.join('..', 'output', 'scenario-2025-05-15')
     os.makedirs(output_dir, exist_ok=True)
 
     config = load_yaml_config(config_path)
@@ -143,7 +171,6 @@ def main():
     # BFSA-RHO algorithm
     bfsa_rho_output = os.path.join(output_dir, 'bfsa_rho_assignment_history.json')
     run_simulation(
-        algorithm_name='BFSA-Rho',
         algorithm_class=BFSARHO,
         radar_network=radar_network,
         targets_by_timestep=targets_by_timestep,
@@ -152,18 +179,75 @@ def main():
     )
 
     # Rule-Based algorithm
-    """
     rule_based_output = os.path.join(output_dir, 'rule_based_assignment_history.json')
     run_simulation(
-        algorithm_name='Rule-Based',
         algorithm_class=RuleBasedScheduler,
         radar_network=radar_network,
         targets_by_timestep=targets_by_timestep,
         total_time=total_time,
         output_json_path=rule_based_output
     )
-    """
+
+    return output_dir, radar_dict, total_time
 
 
 if __name__ == '__main__':
-    main()
+    output_dir, radar_dict, total_time = main()
+    
+    # 初始化绘图器
+    plotter = RadarPlotter(figsize=(14, 8))
+    
+    # 读取分配历史数据
+    bfsa_rho_file = os.path.join(output_dir, 'bfsa_rho_assignment_history.json')
+    rule_based_file = os.path.join(output_dir, 'rule_based_assignment_history.json')
+    
+    with open(bfsa_rho_file, 'r') as f:
+        bfsa_rho_history = json.load(f)
+    with open(rule_based_file, 'r') as f:
+        rule_based_history = json.load(f)
+    
+    # 提取雷达和目标信息
+    def extract_info(history):
+        radars = set()
+        targets = set()
+        for record in history:
+            assignments = record["assignments"]
+            for target_id, assignment in assignments.items():
+                if assignment is not None and assignment["radar_id"] is not None:
+                    radars.add(assignment["radar_id"])
+                    targets.add(target_id)
+        return radars, targets
+    
+    bfsa_radars, bfsa_targets = extract_info(bfsa_rho_history)
+    rule_radars, rule_targets = extract_info(rule_based_history)
+    
+    # 合并雷达和目标信息
+    all_radars = bfsa_radars.union(rule_radars)
+    all_targets = bfsa_targets.union(rule_targets)
+    
+    # 构建雷达信息字典
+    radar_info = {rid: info['number_channel'] for rid, info in radar_dict.items()}
+    target_info = {str(target_id): {} for target_id in all_targets}
+    time_range = (0, total_time)
+    
+    # 生成甘特图
+    vis_output_dir = os.path.join(output_dir, 'visualization')
+    os.makedirs(vis_output_dir, exist_ok=True)
+    
+    # 绘制BFSA-RHO算法的甘特图
+    plotter.plot_radar_gantt(
+        bfsa_rho_history,
+        time_range,
+        radar_info,
+        target_info,
+        os.path.join(vis_output_dir, 'bfsa_rho_gantt.png')
+    )
+    
+    # 绘制Rule-Based算法的甘特图
+    plotter.plot_radar_gantt(
+        rule_based_history,
+        time_range,
+        radar_info,
+        target_info,
+        os.path.join(vis_output_dir, 'rule_based_gantt.png')
+    )
