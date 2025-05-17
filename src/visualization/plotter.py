@@ -536,3 +536,88 @@ class RadarPlotter:
             results['average_metrics'],
             save_path=f"{output_dir}/algorithm_comparison.png"
         )
+
+
+def plot_radar_gantt(self, gantt_data, time_range, radar_info, target_info, save_path=None):
+    """
+    绘制雷达甘特图
+    
+    Args:
+        gantt_data: 甘特图数据，每个元素包含 target_id, radar_id, channel_id, start_time, end_time
+        time_range: 时间范围 (min_time, max_time)
+        radar_info: 雷达信息字典 {radar_id: num_channels, ...}
+        target_info: 目标信息字典 {target_id: {...}, ...}
+        save_path: 保存路径
+    """
+    # 创建图形
+    fig, ax = plt.subplots(figsize=self.figsize)
+    
+    # 设置颜色映射
+    cmap = plt.cm.get_cmap('tab20', len(target_info))
+    colors = {int(tid): cmap(i) for i, tid in enumerate(target_info.keys())}
+    
+    # 计算雷达通道的Y轴位置
+    y_positions = {}
+    current_y = 0
+    
+    for radar_id, num_channels in sorted(radar_info.items()):
+        for channel_id in range(num_channels):
+            y_positions[(radar_id, channel_id)] = current_y
+            current_y += 1
+    
+    # 绘制甘特图
+    for alloc in gantt_data:
+        target_id = alloc['target_id']
+        radar_id = alloc['radar_id']
+        channel_id = alloc['channel_id']
+        start_time = alloc['start_time']  # 使用 start_time 而不是 timestamp
+        end_time = alloc['end_time']
+        
+        y_pos = y_positions.get((radar_id, channel_id), 0)
+        
+        # 绘制分配条
+        ax.barh(y_pos, end_time - start_time, left=start_time, height=0.8, 
+                color=colors.get(target_id, 'gray'), alpha=0.8, 
+                edgecolor='black', linewidth=0.5)
+        
+        # 在条上添加目标ID
+        if end_time - start_time > 1:  # 只在足够宽的条上添加文本
+            ax.text(start_time + (end_time - start_time) / 2, y_pos, 
+                    f'T{target_id}', ha='center', va='center', 
+                    fontsize=8, color='black')
+    
+    # 设置Y轴刻度和标签
+    y_ticks = []
+    y_labels = []
+    for (radar_id, channel_id), y_pos in sorted(y_positions.items(), key=lambda x: x[1]):
+        y_ticks.append(y_pos)
+        y_labels.append(f'R{radar_id}-C{channel_id}')
+    
+    ax.set_yticks(y_ticks)
+    ax.set_yticklabels(y_labels)
+    
+    # 设置X轴范围
+    ax.set_xlim(time_range)
+    
+    # 添加网格线
+    ax.grid(True, axis='x', linestyle='--', alpha=0.7)
+    
+    # 添加标题和标签
+    ax.set_title('雷达-通道分配甘特图')
+    ax.set_xlabel('时间步')
+    ax.set_ylabel('雷达-通道')
+    
+    # 添加图例
+    legend_elements = [plt.Rectangle((0, 0), 1, 1, color=colors.get(int(tid), 'gray'), 
+                                    label=f'目标 {tid}') 
+                      for tid in target_info.keys()]
+    ax.legend(handles=legend_elements, loc='upper right', ncol=3)
+    
+    plt.tight_layout()
+    
+    # 保存或显示图形
+    if save_path:
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        plt.close()
+    else:
+        plt.show()

@@ -14,10 +14,12 @@ import json
 import numpy as np
 import pandas as pd
 import platform
+from matplotlib import pyplot as plt
 
 from core.models.radar_model import Radar, RadarNetwork
 from core.algorithm.bfsa_rho import BFSARHO
-from core.algorithm.rule_based import RuleBasedScheduler  # Modify
+from core.algorithm.rule_based import RuleBasedScheduler
+from core.algorithm.LNS import LNS
 from src.visualization.plotter import RadarPlotter
 
 
@@ -187,63 +189,46 @@ def main():
         total_time=total_time,
         output_json_path=rule_based_output
     )
+    
+    # LNS algorithm
+    lns_output = os.path.join(output_dir, 'lns_assignment_history.json')
+    run_simulation(
+        algorithm_class=LNS,
+        radar_network=radar_network,
+        targets_by_timestep=targets_by_timestep,
+        total_time=total_time,
+        output_json_path=lns_output
+    )
 
+    # 可视化部分 - 使用真实分配历史数据
+    visualize_results(output_dir, radar_dict, targets_by_timestep, total_time)
+    
+    # 返回所需的三个值
     return output_dir, radar_dict, total_time
 
 
-def generate_convergence_data():
-    """生成收敛曲线数据
-    
-    Returns:
-        dict: 包含两种算法的收敛数据
-    """
-    iterations = 20
-    bfsa_values = [0.3]
-    rule_values = [0.2]
-
-    for i in range(1, iterations):
-        bfsa_values.append(min(0.85, bfsa_values[-1] + 0.5 / (i + 2)))
-        rule_values.append(min(0.75, rule_values[-1] + 0.4 / (i + 2)))
-
-    return {
-        "BFSA-Rho": bfsa_values,
-        "Rule-Based": rule_values
-    }
-
-
-def generate_performance_data():
-    """生成性能数据
-    
-    Returns:
-        dict: 包含两种算法的性能数据
-    """
-    runs = 10
-    np.random.seed(42)  # 设置随机种子以确保可重复性
-
-    bfsa_perf = np.random.normal(0.82, 0.02, runs)
-    rule_perf = np.random.normal(0.74, 0.03, runs)
-
-    return {
-        "BFSA-Rho": bfsa_perf.tolist(),
-        "Rule-Based": rule_perf.tolist()
-    }
-
-
-if __name__ == '__main__':
-    output_dir, radar_dict, total_time = main()
-    
+def visualize_results(output_dir, radar_dict, targets_by_timestep, total_time):
+    """使用真实分配历史数据进行可视化"""
     # 初始化绘图器
     plotter = RadarPlotter(figsize=(14, 8))
     
     # 读取分配历史数据
     bfsa_rho_file = os.path.join(output_dir, 'bfsa_rho_assignment_history.json')
     rule_based_file = os.path.join(output_dir, 'rule_based_assignment_history.json')
+    lns_file = os.path.join(output_dir, 'lns_assignment_history.json')
     
+    # 创建可视化输出目录
+    vis_output_dir = os.path.join(output_dir, 'visualization')
+    os.makedirs(vis_output_dir, exist_ok=True)
+    
+    # 读取分配历史数据
     with open(bfsa_rho_file, 'r') as f:
         bfsa_rho_history = json.load(f)
     with open(rule_based_file, 'r') as f:
         rule_based_history = json.load(f)
-
+    with open(lns_file, 'r') as f:
+        lns_history = json.load(f)
+    
     # 提取雷达和目标信息
     def extract_info(history):
         radars = set()
@@ -258,147 +243,208 @@ if __name__ == '__main__':
     
     bfsa_radars, bfsa_targets = extract_info(bfsa_rho_history)
     rule_radars, rule_targets = extract_info(rule_based_history)
+    lns_radars, lns_targets = extract_info(lns_history)
     
     # 合并雷达和目标信息
-    all_radars = bfsa_radars.union(rule_radars)
-    all_targets = bfsa_targets.union(rule_targets)
+    all_radars = bfsa_radars.union(rule_radars).union(lns_radars)
+    all_targets = bfsa_targets.union(rule_targets).union(lns_targets)
     
     # 构建雷达信息字典
-    radar_info = {rid: info['number_channel'] for rid, info in radar_dict.items()}
-    target_info = {str(target_id): {} for target_id in all_targets}
+    radar_info = {}
+    for radar_id in all_radars:
+        radar_info[radar_id] = radar_dict[radar_id]['number_channel']
+    
+    # 构建目标信息字典
+    target_info = {target_id: {} for target_id in all_targets}
+    
+    # 设置时间范围
     time_range = (0, total_time)
     
-    # 创建可视化输出目录
-    vis_output_dir = os.path.join(output_dir, 'visualization')
-    os.makedirs(vis_output_dir, exist_ok=True)
-    
-    # 1. 计算目标切换数据
-    def convert_to_switching_data(history):
-        switching_data = []
-        for i, record in enumerate(history):
-            for target_id, assignment in record['assignments'].items():
-                if assignment['radar_id'] is not None:
-                    switching_data.append({
-                        'target_id': int(target_id),
-                        'radar_id': assignment['radar_id'],
-                        'start_time': record['timestamp'],
-                        'end_time': record['timestamp'] + 1.0
-                    })
-        return switching_data
-
-    bfsa_switching_data = convert_to_switching_data(bfsa_rho_history)
-    rule_switching_data = convert_to_switching_data(rule_based_history)
-    
-    # 绘制目标切换频次图
-    plotter.plot_target_switching(
-        bfsa_switching_data,
-        target_info,
-        algorithm_name="BFSA-Rho",
-        save_path=os.path.join(vis_output_dir, 'bfsa_rho_switching.png')
-    )
-    
-    plotter.plot_target_switching(
-        rule_switching_data,
-        target_info,
-        algorithm_name="Rule-Based",
-        save_path=os.path.join(vis_output_dir, 'rule_based_switching.png')
-    )
-    
-    # 2. 生成收敛数据
-    def calculate_coverage(history):
-        total_assignments = 0
-        valid_assignments = 0
-        for record in history:
-            for assignment in record['assignments'].values():
-                total_assignments += 1
-                if assignment['radar_id'] is not None:
-                    valid_assignments += 1
-        return valid_assignments / total_assignments if total_assignments > 0 else 0
-
-    convergence_data = {
-        "BFSA-Rho": [],
-        "Rule-Based": []
-    }
-    
-    # 计算每个时间步的覆盖率
-    for t in range(total_time):
-        bfsa_history_slice = bfsa_rho_history[:t+1]
-        rule_history_slice = rule_based_history[:t+1]
-        
-        convergence_data["BFSA-Rho"].append(calculate_coverage(bfsa_history_slice))
-        convergence_data["Rule-Based"].append(calculate_coverage(rule_history_slice))
-    
-    # 绘制收敛曲线
-    plotter.plot_convergence_curve(
-        convergence_data,
-        save_path=os.path.join(vis_output_dir, 'convergence_curves.png')
-    )
-    
-    # 3. 生成算法性能对比数据
-    metrics = {
-        "覆盖率": {
-            "BFSA-Rho": calculate_coverage(bfsa_rho_history),
-            "Rule-Based": calculate_coverage(rule_based_history)
-        },
-        "切换次数": {
-            "BFSA-Rho": len(bfsa_switching_data),
-            "Rule-Based": len(rule_switching_data)
-        },
-        "计算时间": {
-            "BFSA-Rho": 0.85,  # 示例值
-            "Rule-Based": 0.95  # 示例值
-        }
-    }
-    
-    # 绘制算法综合性能对比图
-    plotter.plot_algorithm_comparison(
-        ["BFSA-Rho", "Rule-Based"],
-        metrics,
-        save_path=os.path.join(vis_output_dir, 'algorithm_comparison.png')
-    )
-    
-    # 4. 生成完整的评估结果数据
-    # 修改数据格式以适应plot_all_metrics函数的要求
-    def convert_to_target_gantt_format(history):
+    # 将分配历史转换为甘特图数据格式
+    def convert_to_gantt_data(history):
         gantt_data = []
+        target_segments = {target_id: [] for target_id in all_targets}
+        
         for record in history:
-            timestamp = record['timestamp']
-            for target_id, assignment in record['assignments'].items():
-                if assignment['radar_id'] is not None:
-                    gantt_data.append({
-                        'target_id': int(target_id),
-                        'radar_id': assignment['radar_id'],
-                        'channel_id': assignment['channel_id'],
-                        'start_time': timestamp,
-                        'end_time': timestamp + 1.0
-                    })
+            timestamp = record["timestamp"]
+            assignments = record["assignments"]
+            
+            for target_id, assignment in assignments.items():
+                if target_id not in target_segments:
+                    continue
+                
+                segments = target_segments[target_id]
+                
+                if assignment is not None and assignment["radar_id"] is not None:
+                    radar_id = assignment["radar_id"]
+                    channel_id = assignment["channel_id"]
+                    
+                    if not segments or \
+                       segments[-1]["radar_id"] != radar_id or \
+                       segments[-1]["channel_id"] != channel_id or \
+                       segments[-1]["end_time"] != timestamp:
+                        segments.append({
+                            "target_id": int(target_id),
+                            "radar_id": radar_id,
+                            "channel_id": channel_id,
+                            "start_time": timestamp,
+                            "end_time": timestamp + 1.0
+                        })
+                    else:
+                        segments[-1]["end_time"] = timestamp + 1.0
+        
+        for target_id, segments in target_segments.items():
+            gantt_data.extend(segments)
+        
         return gantt_data
-
-    results = {
-        'allocations': {
-            'BFSA-Rho': convert_to_target_gantt_format(bfsa_rho_history),
-            'Rule-Based': convert_to_target_gantt_format(rule_based_history)
-        },
-        'time_range': time_range,
-        'radar_info': radar_info,
-        'target_info': target_info,
-        'convergence_data': convergence_data,
-        'performance_metrics': {
-            '覆盖率': {
-                'BFSA-Rho': [calculate_coverage(bfsa_rho_history)],
-                'Rule-Based': [calculate_coverage(rule_based_history)]
-            },
-            '切换次数': {
-                'BFSA-Rho': [len(bfsa_switching_data)],
-                'Rule-Based': [len(rule_switching_data)]
-            },
-            '计算时间': {
-                'BFSA-Rho': [0.85],
-                'Rule-Based': [0.95]
-            }
-        },
-        'average_metrics': metrics
-    }
     
-    # 生成所有评价指标的图表
-#    plotter.plot_all_metrics(results, output_dir=vis_output_dir)
+    bfsa_gantt_data = convert_to_gantt_data(bfsa_rho_history)
+    rule_gantt_data = convert_to_gantt_data(rule_based_history)
+    lns_gantt_data = convert_to_gantt_data(lns_history)
+    
+    # 绘制雷达甘特图 - 修复：直接使用原始分配历史数据，而不是转换后的甘特图数据
+    plotter.plot_radar_gantt(
+        bfsa_rho_history,  # 使用原始分配历史数据
+        time_range,
+        radar_info,
+        target_info,
+        save_path=os.path.join(vis_output_dir, 'bfsa_rho_radar_gantt.png')
+    )
+    
+    plotter.plot_radar_gantt(
+        rule_based_history,  # 使用原始分配历史数据
+        time_range,
+        radar_info,
+        target_info,
+        save_path=os.path.join(vis_output_dir, 'rule_based_radar_gantt.png')
+    )
+    
+    plotter.plot_radar_gantt(
+        lns_history,  # 使用原始分配历史数据
+        time_range,
+        radar_info,
+        target_info,
+        save_path=os.path.join(vis_output_dir, 'lns_radar_gantt.png')
+    )
+    
+    # 绘制目标甘特图 - 这里需要使用转换后的甘特图数据
+    plotter.plot_target_gantt(
+        bfsa_gantt_data,
+        time_range,
+        target_info,
+        radar_info,
+        save_path=os.path.join(vis_output_dir, 'bfsa_rho_target_gantt.png')
+    )
+    
+    plotter.plot_target_gantt(
+        rule_gantt_data,
+        time_range,
+        target_info,
+        radar_info,
+        save_path=os.path.join(vis_output_dir, 'rule_based_target_gantt.png')
+    )
+    
+    plotter.plot_target_gantt(
+        lns_gantt_data,
+        time_range,
+        target_info,
+        radar_info,
+        save_path=os.path.join(vis_output_dir, 'lns_target_gantt.png')
+    )
+    
+    # 计算目标切换次数
+    def calculate_switches(gantt_data):
+        # 按目标ID分组
+        target_segments = {}
+        for segment in gantt_data:
+            target_id = segment["target_id"]
+            if target_id not in target_segments:
+                target_segments[target_id] = []
+            target_segments[target_id].append(segment)
+        
+        # 计算每个目标的切换次数
+        switches = {}
+        for target_id, segments in target_segments.items():
+            # 按开始时间排序
+            sorted_segments = sorted(segments, key=lambda x: x["start_time"])
+            
+            # 计算雷达切换次数
+            switch_count = 0
+            for i in range(1, len(sorted_segments)):
+                if sorted_segments[i]["radar_id"] != sorted_segments[i - 1]["radar_id"]:
+                    switch_count += 1
+            
+            switches[target_id] = switch_count
+        
+        return switches
+    
+    bfsa_switches = calculate_switches(bfsa_gantt_data)
+    rule_switches = calculate_switches(rule_gantt_data)
+    lns_switches = calculate_switches(lns_gantt_data)
+    
+    # 绘制切换次数比较图
+    plt.figure(figsize=(12, 6))
+    
+    # 准备数据
+    target_ids = sorted(list(all_targets), key=int)
+    bfsa_switch_values = [bfsa_switches.get(tid, 0) for tid in target_ids]
+    rule_switch_values = [rule_switches.get(tid, 0) for tid in target_ids]
+    lns_switch_values = [lns_switches.get(tid, 0) for tid in target_ids]
+    
+    x = np.arange(len(target_ids))
+    width = 0.25
+    
+    # 绘制柱状图
+    plt.bar(x - width, bfsa_switch_values, width, label='BFSA-Rho')
+    plt.bar(x, rule_switch_values, width, label='Rule-Based')
+    plt.bar(x + width, lns_switch_values, width, label='LNS')
+    
+    plt.xlabel('目标ID')
+    plt.ylabel('雷达切换次数')
+    plt.title('不同算法的目标雷达切换次数比较')
+    plt.xticks(x, [f'T{tid}' for tid in target_ids], rotation=45)
+    plt.legend()
+    plt.tight_layout()
+    
+    plt.savefig(os.path.join(vis_output_dir, 'radar_switches_comparison.png'), dpi=300)
+    
+    # 绘制分配率随时间变化图
+    plt.figure(figsize=(12, 6))
+    
+    # 计算每个时间步的分配率
+    def calculate_assignment_rates(history):
+        rates = []
+        for record in history:
+            assignments = record["assignments"]
+            total = len(assignments)
+            assigned = sum(1 for a in assignments.values() if a is not None and a["radar_id"] is not None)
+            rates.append(assigned / total if total > 0 else 0)
+        return rates
+    
+    bfsa_rates = calculate_assignment_rates(bfsa_rho_history)
+    rule_rates = calculate_assignment_rates(rule_based_history)
+    lns_rates = calculate_assignment_rates(lns_history)
+    
+    time_steps = list(range(len(bfsa_rates)))
+    
+    plt.plot(time_steps, bfsa_rates, 'b-', label='BFSA-Rho')
+    plt.plot(time_steps, rule_rates, 'r-', label='Rule-Based')
+    plt.plot(time_steps, lns_rates, 'g-', label='LNS')
+    
+    plt.xlabel('时间步')
+    plt.ylabel('分配率')
+    plt.title('不同算法的目标分配率随时间变化')
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    
+    plt.savefig(os.path.join(vis_output_dir, 'assignment_rates_comparison.png'), dpi=300)
+    
+    print(f"可视化结果已保存到: {vis_output_dir}")
+
+# 在main函数中调用可视化函数
+if __name__ == "__main__":
+    output_dir, radar_dict, total_time = main()
+    
+    # 运行模拟
+    visualize_results(output_dir)

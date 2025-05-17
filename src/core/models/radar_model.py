@@ -103,7 +103,7 @@ class Radar:
         if distance <= self.radar_radius:
             return True
         else:
-            print(f"The target position is outside the range")
+            # print(f"The target position is outside the range")
             return False
 
 
