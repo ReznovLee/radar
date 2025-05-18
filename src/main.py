@@ -16,6 +16,9 @@ import pandas as pd
 import platform
 from matplotlib import pyplot as plt
 
+"""import matplotlib
+matplotlib.rc("font",family='TimeNewRoman')"""
+
 from core.models.radar_model import Radar, RadarNetwork
 from core.algorithm.bfsa_rho import BFSARHO
 from core.algorithm.rule_based import RuleBasedScheduler
@@ -44,17 +47,17 @@ def load_radar_csv(radar_csv_path):
     :return radar: loaded radar csv file
     """
     df = pd.read_csv(radar_csv_path)
-    radar_dict = {}
+    radars_dict = {}
     for _, row in df.iterrows():
         radar_id = int(row['id'])
-        radar_dict[radar_id] = {
+        radars_dict[radar_id] = {
             'x': float(row['x']),
             'y': float(row['y']),
             'z': float(row['z']),
             'radius': float(row['radius']),
             'number_channel': int(row['number_channel'])
         }
-    return radar_dict
+    return radars_dict
 
 
 def load_targets_csv(target_csv_path):
@@ -81,16 +84,16 @@ def load_targets_csv(target_csv_path):
     return targets_by_timestep
 
 
-def build_radar_network(radar_dict):
+def build_radar_network(radars_dict):
     """ Build radar network
 
     Using Radar class builds radar network
 
-    :param radar_dict: radar dict from radar_dict
+    :param radars_dict: radar dict from radar_dict
     :return radar_network: radar network
     """
     radars = {}
-    for radar_id, info in radar_dict.items():
+    for radar_id, info in radars_dict.items():
         radar = Radar(
             radar_id=radar_id,
             radar_position=np.array([info['x'], info['y'], info['z']]),
@@ -105,12 +108,12 @@ def build_radar_network(radar_dict):
 def run_simulation(algorithm_class,
                    radar_network,
                    targets_by_timestep,
-                   total_time,
+                   sim_total_time,
                    output_json_path):
     assignment_history = []
     radar_channel_state = {rid: [None] * radar_network.radars[rid].num_channels for rid in radar_network.radars}
     algorithm = algorithm_class(radar_network)
-    for t in range(total_time + 1):
+    for t in range(sim_total_time + 1):
         targets = targets_by_timestep.get(t, [])
         observed_targets = []
         for target in targets:
@@ -152,299 +155,161 @@ def run_simulation(algorithm_class,
         json.dump(assignment_history, f, indent=2)
 
 
+def load_assignment_history(file_path):
+    """加载分配历史数据"""
+    with open(file_path, 'r') as f:
+        return json.load(f)
+
+
 def main():
     if platform.system() == 'Windows':
         config_path = os.path.join("data\\config\\param_config.yaml")  # windows
-        data_dir = "data"
     else:
         config_path = os.path.join('data', 'config', 'param_config.yaml')  # linux
-        data_dir = "data"
-    radar_csv_path = os.path.join('..', 'output', 'scenario-2025-05-13', '10-radar.csv')
-    target_csv_path = os.path.join('..', 'output', 'scenario-2025-05-13', '100-targets.csv')
-    output_dir = os.path.join('..', 'output', 'scenario-2025-05-15')
-    os.makedirs(output_dir, exist_ok=True)
+    radar_csv_path = os.path.join('..', 'output', 'scenario-2025-05-18', '5-radar.csv')
+    target_csv_path = os.path.join('..', 'output', 'scenario-2025-05-18', '50-targets.csv')
+    outputs_dir = os.path.join('..', 'output', 'scenario-2025-05-18')
+    os.makedirs(outputs_dir, exist_ok=True)
 
     config = load_yaml_config(config_path)
-    total_time = int(config['simulation']['total_time'])
-    radar_dict = load_radar_csv(radar_csv_path)
-    targets_by_timestep = load_targets_csv(target_csv_path)
-    radar_network = build_radar_network(radar_dict)
+    sim_total_time = int(config['simulation']['total_time'])
+    radars_dict = load_radar_csv(radar_csv_path)
+    targets_by_timestep = load_targets_csv(target_csv_path) # targets_by_timestep 在这里加载
+    radar_network = build_radar_network(radars_dict)
 
     # BFSA-RHO algorithm
-    bfsa_rho_output = os.path.join(output_dir, 'bfsa_rho_assignment_history.json')
+    bfsa_rho_output = os.path.join(outputs_dir, 'bfsa_rho_assignment_history.json')
     run_simulation(
         algorithm_class=BFSARHO,
         radar_network=radar_network,
         targets_by_timestep=targets_by_timestep,
-        total_time=total_time,
+        sim_total_time=sim_total_time,
         output_json_path=bfsa_rho_output
     )
 
     # Rule-Based algorithm
-    rule_based_output = os.path.join(output_dir, 'rule_based_assignment_history.json')
+    rule_based_output = os.path.join(outputs_dir, 'rule_based_assignment_history.json')
     run_simulation(
         algorithm_class=RuleBasedScheduler,
         radar_network=radar_network,
         targets_by_timestep=targets_by_timestep,
-        total_time=total_time,
+        sim_total_time=sim_total_time,
         output_json_path=rule_based_output
     )
-    
+
     # LNS algorithm
-    lns_output = os.path.join(output_dir, 'lns_assignment_history.json')
+    lns_output = os.path.join(outputs_dir, 'lns_assignment_history.json')
     run_simulation(
-        algorithm_class=LNS,
+        algorithm_class=LNS, # 假设LNS类也已定义和导入
         radar_network=radar_network,
         targets_by_timestep=targets_by_timestep,
-        total_time=total_time,
+        sim_total_time=sim_total_time,
         output_json_path=lns_output
     )
+    
+    # 根据 traceback，visualize_results 调用在 main 函数的第 211 行附近
+    # 将 targets_by_timestep 传递给 visualize_results
+    visualize_results(outputs_dir, radars_dict, targets_by_timestep, sim_total_time)
 
-    # 可视化部分 - 使用真实分配历史数据
-    visualize_results(output_dir, radar_dict, targets_by_timestep, total_time)
-    
-    # 返回所需的三个值
-    return output_dir, radar_dict, total_time
+    # 根据 traceback, main() 函数的返回
+    return outputs_dir, radars_dict, sim_total_time
 
 
-def visualize_results(output_dir, radar_dict, targets_by_timestep, total_time):
-    """使用真实分配历史数据进行可视化"""
-    # 初始化绘图器
-    plotter = RadarPlotter(figsize=(14, 8))
+def visualize_results(outputs_dir, radars_dict, targets_by_timestep, sim_total_time):
+    """可视化仿真结果"""
+    plotter = RadarPlotter()
     
-    # 读取分配历史数据
-    bfsa_rho_file = os.path.join(output_dir, 'bfsa_rho_assignment_history.json')
-    rule_based_file = os.path.join(output_dir, 'rule_based_assignment_history.json')
-    lns_file = os.path.join(output_dir, 'lns_assignment_history.json')
+    # 加载分配历史
+    bfsa_history = load_assignment_history(os.path.join(outputs_dir, 'bfsa_rho_assignment_history.json'))
+    rule_history = load_assignment_history(os.path.join(outputs_dir, 'rule_based_assignment_history.json'))
     
-    # 创建可视化输出目录
-    vis_output_dir = os.path.join(output_dir, 'visualization')
-    os.makedirs(vis_output_dir, exist_ok=True)
-    
-    # 读取分配历史数据
-    with open(bfsa_rho_file, 'r') as f:
-        bfsa_rho_history = json.load(f)
-    with open(rule_based_file, 'r') as f:
-        rule_based_history = json.load(f)
-    with open(lns_file, 'r') as f:
-        lns_history = json.load(f)
-    
-    # 提取雷达和目标信息
-    def extract_info(history):
-        radars = set()
-        targets = set()
-        for record in history:
-            assignments = record["assignments"]
-            for target_id, assignment in assignments.items():
-                if assignment is not None and assignment["radar_id"] is not None:
-                    radars.add(assignment["radar_id"])
-                    targets.add(target_id)
-        return radars, targets
-    
-    bfsa_radars, bfsa_targets = extract_info(bfsa_rho_history)
-    rule_radars, rule_targets = extract_info(rule_based_history)
-    lns_radars, lns_targets = extract_info(lns_history)
-    
-    # 合并雷达和目标信息
-    all_radars = bfsa_radars.union(rule_radars).union(lns_radars)
-    all_targets = bfsa_targets.union(rule_targets).union(lns_targets)
-    
-    # 构建雷达信息字典
-    radar_info = {}
-    for radar_id in all_radars:
-        radar_info[radar_id] = radar_dict[radar_id]['number_channel']
-    
-    # 构建目标信息字典
-    target_info = {target_id: {} for target_id in all_targets}
-    
-    # 设置时间范围
-    time_range = (0, total_time)
-    
-    # 将分配历史转换为甘特图数据格式
-    def convert_to_gantt_data(history):
-        gantt_data = []
-        target_segments = {target_id: [] for target_id in all_targets}
-        
-        for record in history:
-            timestamp = record["timestamp"]
-            assignments = record["assignments"]
-            
-            for target_id, assignment in assignments.items():
-                if target_id not in target_segments:
-                    continue
-                
-                segments = target_segments[target_id]
-                
-                if assignment is not None and assignment["radar_id"] is not None:
-                    radar_id = assignment["radar_id"]
-                    channel_id = assignment["channel_id"]
-                    
-                    if not segments or \
-                       segments[-1]["radar_id"] != radar_id or \
-                       segments[-1]["channel_id"] != channel_id or \
-                       segments[-1]["end_time"] != timestamp:
-                        segments.append({
-                            "target_id": int(target_id),
-                            "radar_id": radar_id,
-                            "channel_id": channel_id,
-                            "start_time": timestamp,
-                            "end_time": timestamp + 1.0
-                        })
-                    else:
-                        segments[-1]["end_time"] = timestamp + 1.0
-        
-        for target_id, segments in target_segments.items():
-            gantt_data.extend(segments)
-        
-        return gantt_data
-    
-    bfsa_gantt_data = convert_to_gantt_data(bfsa_rho_history)
-    rule_gantt_data = convert_to_gantt_data(rule_based_history)
-    lns_gantt_data = convert_to_gantt_data(lns_history)
-    
-    # 绘制雷达甘特图 - 修复：直接使用原始分配历史数据，而不是转换后的甘特图数据
+    # 绘制雷达甘特图
     plotter.plot_radar_gantt(
-        bfsa_rho_history,  # 使用原始分配历史数据
-        time_range,
-        radar_info,
-        target_info,
-        save_path=os.path.join(vis_output_dir, 'bfsa_rho_radar_gantt.png')
+        bfsa_history,
+        (0, sim_total_time),
+        {rid: info['number_channel'] for rid, info in radars_dict.items()},
+        {target['id']: target for timestep_targets in targets_by_timestep.values() 
+         for target in timestep_targets},
+        os.path.join(outputs_dir, 'bfsa_rho_radar_gantt.png')
     )
     
     plotter.plot_radar_gantt(
-        rule_based_history,  # 使用原始分配历史数据
-        time_range,
-        radar_info,
-        target_info,
-        save_path=os.path.join(vis_output_dir, 'rule_based_radar_gantt.png')
+        rule_history,
+        (0, sim_total_time),
+        {rid: info['number_channel'] for rid, info in radars_dict.items()},
+        {target['id']: target for timestep_targets in targets_by_timestep.values() 
+         for target in timestep_targets},
+        os.path.join(outputs_dir, 'rule_based_radar_gantt.png')
     )
     
-    plotter.plot_radar_gantt(
-        lns_history,  # 使用原始分配历史数据
-        time_range,
-        radar_info,
-        target_info,
-        save_path=os.path.join(vis_output_dir, 'lns_radar_gantt.png')
-    )
-    
-    # 绘制目标甘特图 - 这里需要使用转换后的甘特图数据
+    # 绘制目标甘特图
     plotter.plot_target_gantt(
-        bfsa_gantt_data,
-        time_range,
-        target_info,
-        radar_info,
-        save_path=os.path.join(vis_output_dir, 'bfsa_rho_target_gantt.png')
+        bfsa_history,
+        (0, sim_total_time),
+        {target['id']: target for timestep_targets in targets_by_timestep.values() 
+         for target in timestep_targets},
+        radars_dict,
+        os.path.join(outputs_dir, 'bfsa_rho_target_gantt.png')
     )
     
     plotter.plot_target_gantt(
-        rule_gantt_data,
-        time_range,
-        target_info,
-        radar_info,
-        save_path=os.path.join(vis_output_dir, 'rule_based_target_gantt.png')
+        rule_history,
+        (0, sim_total_time),
+        {target['id']: target for timestep_targets in targets_by_timestep.values() 
+         for target in timestep_targets},
+        radars_dict,
+        os.path.join(outputs_dir, 'rule_based_target_gantt.png')
     )
     
-    plotter.plot_target_gantt(
-        lns_gantt_data,
-        time_range,
-        target_info,
-        radar_info,
-        save_path=os.path.join(vis_output_dir, 'lns_target_gantt.png')
-    )
-    
-    # 计算目标切换次数
-    def calculate_switches(gantt_data):
-        # 按目标ID分组
-        target_segments = {}
-        for segment in gantt_data:
-            target_id = segment["target_id"]
-            if target_id not in target_segments:
-                target_segments[target_id] = []
-            target_segments[target_id].append(segment)
-        
-        # 计算每个目标的切换次数
-        switches = {}
-        for target_id, segments in target_segments.items():
-            # 按开始时间排序
-            sorted_segments = sorted(segments, key=lambda x: x["start_time"])
-            
-            # 计算雷达切换次数
-            switch_count = 0
-            for i in range(1, len(sorted_segments)):
-                if sorted_segments[i]["radar_id"] != sorted_segments[i - 1]["radar_id"]:
-                    switch_count += 1
-            
-            switches[target_id] = switch_count
-        
-        return switches
-    
-    bfsa_switches = calculate_switches(bfsa_gantt_data)
-    rule_switches = calculate_switches(rule_gantt_data)
-    lns_switches = calculate_switches(lns_gantt_data)
-    
-    # 绘制切换次数比较图
-    plt.figure(figsize=(12, 6))
-    
-    # 准备数据
-    target_ids = sorted(list(all_targets), key=int)
-    bfsa_switch_values = [bfsa_switches.get(tid, 0) for tid in target_ids]
-    rule_switch_values = [rule_switches.get(tid, 0) for tid in target_ids]
-    lns_switch_values = [lns_switches.get(tid, 0) for tid in target_ids]
-    
-    x = np.arange(len(target_ids))
-    width = 0.25
-    
-    # 绘制柱状图
-    plt.bar(x - width, bfsa_switch_values, width, label='BFSA-Rho')
-    plt.bar(x, rule_switch_values, width, label='Rule-Based')
-    plt.bar(x + width, lns_switch_values, width, label='LNS')
-    
-    plt.xlabel('目标ID')
-    plt.ylabel('雷达切换次数')
-    plt.title('不同算法的目标雷达切换次数比较')
-    plt.xticks(x, [f'T{tid}' for tid in target_ids], rotation=45)
-    plt.legend()
-    plt.tight_layout()
-    
-    plt.savefig(os.path.join(vis_output_dir, 'radar_switches_comparison.png'), dpi=300)
-    
-    # 绘制分配率随时间变化图
-    plt.figure(figsize=(12, 6))
-    
-    # 计算每个时间步的分配率
-    def calculate_assignment_rates(history):
-        rates = []
-        for record in history:
-            assignments = record["assignments"]
-            total = len(assignments)
-            assigned = sum(1 for a in assignments.values() if a is not None and a["radar_id"] is not None)
-            rates.append(assigned / total if total > 0 else 0)
-        return rates
-    
-    bfsa_rates = calculate_assignment_rates(bfsa_rho_history)
-    rule_rates = calculate_assignment_rates(rule_based_history)
-    lns_rates = calculate_assignment_rates(lns_history)
-    
-    time_steps = list(range(len(bfsa_rates)))
-    
-    plt.plot(time_steps, bfsa_rates, 'b-', label='BFSA-Rho')
-    plt.plot(time_steps, rule_rates, 'r-', label='Rule-Based')
-    plt.plot(time_steps, lns_rates, 'g-', label='LNS')
-    
-    plt.xlabel('时间步')
-    plt.ylabel('分配率')
-    plt.title('不同算法的目标分配率随时间变化')
-    plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
-    
-    plt.savefig(os.path.join(vis_output_dir, 'assignment_rates_comparison.png'), dpi=300)
-    
-    print(f"可视化结果已保存到: {vis_output_dir}")
+    # 绘制所有算法的分配历史
+    bfsa_rho_history_path = os.path.join(outputs_dir, 'bfsa_rho_assignment_history.json')
+    rule_based_history_path = os.path.join(outputs_dir, 'rule_based_assignment_history.json')
+    lns_history_path = os.path.join(outputs_dir, 'lns_assignment_history.json')
 
-# 在main函数中调用可视化函数
+    assignment_histories = {}
+    if os.path.exists(bfsa_rho_history_path):
+        assignment_histories["BFSA-RHO"] = load_assignment_history(bfsa_rho_history_path)
+    if os.path.exists(rule_based_history_path):
+        assignment_histories["Rule-Based"] = load_assignment_history(rule_based_history_path)
+    if os.path.exists(lns_history_path):
+        assignment_histories["LNS"] = load_assignment_history(lns_history_path)
+    
+    if not assignment_histories:
+        print("警告: 未找到任何分配历史文件。将跳过优先级满足度绘图。")
+    else:
+        # 为每个算法绘制优先级满足度图
+        target_info = {}
+        for timestep, targets in targets_by_timestep.items():
+            for target in targets:
+                target_id = str(target['id'])  # 转换为字符串以匹配JSON中的格式
+                if target_id not in target_info:
+                    target_info[target_id] = {
+                        'priority': target['priority'],
+                        'type': target['target_type']
+                    }
+
+    print(f"可视化结果已保存到目录: {outputs_dir}")
+
+    # 删除未定义的函数调用
+    """
+    # 3. 优先级满足率柱状图
+    plot_priority_satisfaction(
+        assignment_histories,
+        targets_by_timestep,
+        save_path=os.path.join(vis_output_dir, 'priority_satisfaction.png')
+    )
+    
+    # 4. 综合性能评分图
+    plot_overall_performance(
+        assignment_histories,
+        targets_by_timestep,
+        radar_info,
+        save_path=os.path.join(vis_output_dir, 'overall_performance')
+    )
+    """
+
+# In main function invoke visualization function
 if __name__ == "__main__":
     output_dir, radar_dict, total_time = main()
-    
-    # 运行模拟
-    visualize_results(output_dir)
+    # print(f"Simulation finished. Output directory: {output_dir}")
+    # print(f"Total simulation time: {total_time}")

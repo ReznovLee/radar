@@ -12,11 +12,8 @@ import numpy as np
 from scipy.sparse import csr_matrix
 from typing import List, Dict, Tuple, Set
 import random
-import logging
-from core.models.radar_model import RadarNetwork
-from core.utils.filter import BallisticMissileEKF, CruiseMissileEKF, AircraftIMMEKF
-from core.utils.metrics import RadarPerformanceMetrics
-from core.utils.constraints import ConstraintChecker
+from src.core.models.radar_model import RadarNetwork
+from src.core.utils.constraints import ConstraintChecker
 
 
 class LNS:
@@ -26,7 +23,7 @@ class LNS:
     Finds better radar-target assignments by iteratively destroying and repairing the current solution.
     """
 
-    def __init__(self, radar_network: RadarNetwork, max_iterations: int = 3, 
+    def __init__(self, radar_network: RadarNetwork, max_iterations: int = 2,
                  destroy_percentage: float = 0.3, tabu_size: int = 5):
         """
         Initialize LNS algorithm

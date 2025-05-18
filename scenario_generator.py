@@ -246,14 +246,6 @@ def generate_random_targets(center_drop_position_str, target_dispersion_rate, ti
             initial_cruise_altitude
         ])
 
-        """
-        delta_x = cruise_end_point[0] - drop_point[0]
-        delta_y = cruise_end_point[1] - drop_point[1]
-        delta_z = cruise_end_point[2]
-        dive_direction = np.array([delta_x, delta_y, delta_z]) / np.sqrt(delta_x ** 2 + delta_y ** 2 + delta_z ** 2)
-        dive_direction_array = np.array([dive_direction[0], dive_direction[1], dive_direction[2]])
-        """
-
         delta_x = drop_point[0] - cruise_end_point[0]
         delta_y = drop_point[1] - cruise_end_point[1]
         delta_z = -cruise_end_point[2]  # 从巡航高度到地面
