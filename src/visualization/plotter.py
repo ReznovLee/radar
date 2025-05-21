@@ -134,6 +134,7 @@ class RadarPlotter:
         plt.tight_layout()
         
         if save_path:
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
             plt.savefig(save_path, bbox_inches='tight', dpi=300)
             plt.close()
         else:
@@ -352,17 +353,36 @@ class RadarPlotter:
         # 计算每个目标的雷达切换次数
         target_switches = {}
         
-        # 按目标ID和时间排序
-        sorted_data = sorted(allocation_data, key=lambda x: (x['target_id'], x['start_time']))
+        # 从分配历史中提取目标切换数据
+        target_radar_history = {}
         
-        # 计算切换次数
-        for target_id in set([t['target_id'] for t in sorted_data]):
-            target_allocs = [a for a in sorted_data if a['target_id'] == target_id]
+        # 遍历时间步骤
+        for step_data in allocation_data:
+            # 确保 step_data 是字典类型
+            if isinstance(step_data, dict) and 'timestamp' in step_data and 'assignments' in step_data:
+                timestamp = step_data['timestamp']
+                assignments = step_data['assignments']
+                
+                # 更新每个目标的雷达分配历史
+                for target_id, assignment in assignments.items():
+                    if target_id not in target_radar_history:
+                        target_radar_history[target_id] = []
+                    
+                    if assignment is not None and assignment['radar_id'] is not None:
+                        target_radar_history[target_id].append({
+                            'timestamp': timestamp,
+                            'radar_id': assignment['radar_id']
+                        })
+        
+        # 计算每个目标的雷达切换次数
+        for target_id, history in target_radar_history.items():
+            # 按时间戳排序
+            sorted_history = sorted(history, key=lambda x: x['timestamp'])
             switches = 0
             prev_radar = None
             
-            for alloc in target_allocs:
-                current_radar = alloc['radar_id']
+            for entry in sorted_history:
+                current_radar = entry['radar_id']
                 if prev_radar is not None and current_radar != prev_radar:
                     switches += 1
                 prev_radar = current_radar
@@ -387,15 +407,17 @@ class RadarPlotter:
         ax.set_ylabel('Radar switch counts')
         
         # 添加平均切换次数线
-        avg_switches = np.mean(list(target_switches.values()))
-        ax.axhline(y=avg_switches, color='red', linestyle='--', alpha=0.7)
-        ax.text(len(target_ids) - 0.5, avg_switches + 0.2, f'avarage: {avg_switches:.2f}', color='red')
+        if target_switches:  # 确保有数据再计算平均值
+            avg_switches = np.mean(list(target_switches.values()))
+            ax.axhline(y=avg_switches, color='red', linestyle='--', alpha=0.7)
+            ax.text(len(target_ids) - 0.5, avg_switches + 0.2, f'avarage: {avg_switches:.2f}', color='red')
         
         # 调整布局
         plt.tight_layout()
         
         # 保存或显示图表
         if save_path:
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
             plt.savefig(save_path, bbox_inches='tight')
             plt.close()
         else:
@@ -438,6 +460,7 @@ class RadarPlotter:
         
         # 保存或显示图表
         if save_path:
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
             plt.savefig(save_path, bbox_inches='tight')
             plt.close()
         else:
@@ -490,6 +513,7 @@ class RadarPlotter:
         
         # 保存或显示图表
         if save_path:
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
             plt.savefig(save_path, bbox_inches='tight')
             plt.close()
         else:
@@ -540,6 +564,7 @@ class RadarPlotter:
         
         # 保存或显示图表
         if save_path:
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
             plt.savefig(save_path, bbox_inches='tight')
             plt.close()
         else:
@@ -609,100 +634,98 @@ class RadarPlotter:
         )
 
     def plot_radar_utilization_heatmap(self, 
-                                     assignment_histories, 
-                                     radar_info, 
-                                     time_range, 
-                                     save_path=None):
-        """绘制雷达资源利用率热图"""
-        # 提取数据
-        radar_ids = sorted(radar_info.keys())
-        timestamps = np.arange(time_range[0], time_range[1])
+                                  assignment_history, 
+                                  radar_info,
+                                  time_range,
+                                  algorithm_name="",
+                                  save_path=None):
+        """
+        绘制雷达利用率热力图
         
-        # 初始化利用率矩阵 [雷达数 x 时间步数]
-        utilization = np.zeros((len(radar_ids), len(timestamps)))
+        Args:
+            assignment_history: 分配历史数据
+            radar_info: 雷达信息字典
+            time_range: 时间范围元组 (start, end)
+            algorithm_name: 算法名称
+            save_path: 保存路径
+        """
+        # 创建雷达利用率矩阵
+        # 检查radar_info是否为字典，如果不是，则假设它是时间范围
+        if isinstance(radar_info, dict):
+            radar_ids = sorted(radar_info.keys())
+        else:
+            # 如果radar_info不是字典，那么它可能是时间范围
+            # 此时需要从assignment_history中提取雷达ID
+            radar_ids = []
+            for step in assignment_history:
+                for _, assignment in step['assignments'].items():
+                    if assignment is not None and assignment['radar_id'] is not None:
+                        if assignment['radar_id'] not in radar_ids:
+                            radar_ids.append(assignment['radar_id'])
+            radar_ids = sorted(radar_ids)
+            
+            # 如果time_range是None，则使用radar_info作为time_range
+            if time_range is None:
+                time_range = radar_info
         
-        # 计算每个雷达在每个时间步的利用率
-        for t_idx, t in enumerate(timestamps):
-            for r_idx, radar_id in enumerate(radar_ids):
-                # 获取该雷达的总通道数
-                total_channels = radar_info[radar_id]
+        time_steps = int(time_range[1] - time_range[0]) + 1
+        utilization_matrix = np.zeros((len(radar_ids), time_steps))
+        
+        # 计算每个时间步每个雷达的利用率
+        for step in assignment_history:
+            t = int(step['timestamp'] - time_range[0])
+            if t < 0 or t >= time_steps:
+                continue
                 
-                # 统计该时间步该雷达分配的通道数
-                used_channels = 0
-                for algo_name, history in assignment_histories.items():
-                    if t_idx < len(history):
-                        assignments = history[t_idx]['assignments']
-                        for target_id, assignment in assignments.items():
-                            if assignment['radar_id'] == radar_id and assignment['channel_id'] is not None:
-                                used_channels += 1
-                
-                # 计算利用率
-                utilization[r_idx, t_idx] = used_channels / total_channels if total_channels > 0 else 0
+            # 统计每个雷达分配的通道数
+            radar_channel_count = {rid: 0 for rid in radar_ids}
+            radar_total_channels = {rid: 0 for rid in radar_ids}
+            
+            for _, assignment in step['assignments'].items():
+                if assignment is not None and assignment['radar_id'] is not None:
+                    radar_id = assignment['radar_id']
+                    if radar_id in radar_channel_count:
+                        radar_channel_count[radar_id] += 1
+            
+            # 计算利用率
+            for i, rid in enumerate(radar_ids):
+                # 如果radar_info是字典，使用其中的通道数
+                if isinstance(radar_info, dict) and rid in radar_info:
+                    total_channels = radar_info[rid]
+                else:
+                    # 否则假设每个雷达有4个通道（默认值）
+                    total_channels = 4
+                    
+                if radar_channel_count[rid] > 0:
+                    utilization_matrix[i, t] = radar_channel_count[rid] / total_channels
         
-        # 绘制热图
-        fig, ax = self._create_figure("雷达资源利用率热图")
-        im = ax.imshow(utilization, aspect='auto', cmap='YlOrRd', vmin=0, vmax=1)
+        # 绘制热力图
+        fig, ax = plt.subplots(figsize=self.figsize, dpi=self.dpi)
+        
+        title = f"雷达利用率热力图 - {algorithm_name}" if algorithm_name else "雷达利用率热力图"
+        ax.set_title(title)
+        
+        im = ax.imshow(utilization_matrix, cmap='hot', aspect='auto', vmin=0, vmax=1)
         
         # 设置坐标轴
+        ax.set_xlabel('时间')
+        ax.set_ylabel('雷达ID')
         ax.set_yticks(np.arange(len(radar_ids)))
-        ax.set_yticklabels([f'雷达 {rid}' for rid in radar_ids])
-        
-        # 设置X轴刻度（每10个时间步显示一个刻度）
-        step = max(1, len(timestamps) // 10)
-        ax.set_xticks(np.arange(0, len(timestamps), step))
-        ax.set_xticklabels(np.arange(time_range[0], time_range[1], step))
-        
-        ax.set_xlabel('时间步')
-        ax.set_ylabel('雷达')
+        ax.set_yticklabels([f'R{rid}' for rid in radar_ids])
         
         # 添加颜色条
         cbar = fig.colorbar(im, ax=ax)
         cbar.set_label('利用率 (已分配通道/总通道)')
         
-        # 保存或显示图表
+        plt.tight_layout()
+        
         if save_path:
+            # 确保目录存在
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
             plt.savefig(save_path, bbox_inches='tight', dpi=300)
             plt.close()
         else:
             plt.show()
-        
-        def plot_performance_radar_chart(metrics_data, save_path=None):
-            """绘制算法性能雷达图"""
-            # 指标和算法
-            metrics = ['分配率', '优先级满足率', '跟踪连续性', '负载均衡度', '约束满足率']
-            algorithms = list(metrics_data.keys())
-            
-            # 设置雷达图
-            angles = np.linspace(0, 2*np.pi, len(metrics), endpoint=False).tolist()
-            angles += angles[:1]  # 闭合图形
-            
-            fig, ax = plt.subplots(figsize=(10, 8), subplot_kw=dict(polar=True))
-            
-            # 绘制每个算法的性能
-            for algo_idx, algo in enumerate(algorithms):
-                values = metrics_data[algo]
-                values += values[:1]  # 闭合图形
-                
-                ax.plot(angles, values, linewidth=2, label=algo)
-                ax.fill(angles, values, alpha=0.1)
-            
-            # 设置标签和刻度
-            ax.set_thetagrids(np.degrees(angles[:-1]), metrics)
-            ax.set_ylim(0, 1)
-            ax.set_rlabel_position(0)
-            ax.set_title("算法性能比较", fontsize=16)
-            ax.grid(True)
-            
-            # 添加图例
-            ax.legend(loc='upper right', bbox_to_anchor=(1.3, 1.0))
-            
-            plt.tight_layout()
-            
-            if save_path:
-                plt.savefig(save_path, dpi=300, bbox_inches='tight')
-                plt.close()
-            else:
-                plt.show()
 
     def plot_priority_satisfaction(self,
                                  allocation_data,
@@ -865,6 +888,7 @@ class RadarPlotter:
                             init_func=init, blit=False, interval=interval)
             
             if save_path:
+                os.makedirs(os.path.dirname(save_path), exist_ok=True)
                 ani.save(save_path, writer='ffmpeg', dpi=200)
                 plt.close()
             else:
@@ -872,7 +896,7 @@ class RadarPlotter:
             
             return ani
 
-    def plot_overall_performance(assignment_histories, targets_by_timestep, radar_info, save_path=None):
+    def plot_overall_performance(self, assignment_histories, targets_by_timestep, radar_info, save_path=None):
         """绘制算法综合性能评分图"""
         algorithms = list(assignment_histories.keys())
         
