@@ -33,8 +33,8 @@ class BFSARHO:
         
         # 多目标优化权重
         self.weights = {
-            'tracking_continuity': 0.35,  # 跟踪连续性权重
-            'switching_cost': 0.25,       # 切换代价权重
+            'tracking_continuity': 0.3,  # 跟踪连续性权重
+            'switching_cost': 0.3,       # 切换代价权重
             'priority': 0.2,             # 目标优先级权重
             'coverage_quality': 0.1,      # 覆盖质量权重
             'load_balance': 0.1          # 负载均衡权重（新增）

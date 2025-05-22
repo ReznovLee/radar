@@ -140,6 +140,132 @@ class RadarPlotter:
         else:
             plt.show()
 
+    def plot_radar_channel_occupancy_over_time(self,
+                                           assignment_histories,
+                                           radar_info,
+                                           time_range,
+                                           save_path=None):
+        """
+        绘制随时间变化的雷达信道占用率曲线。
+        
+        Args:
+            assignment_histories: 字典，键为算法名称，值为该算法的分配历史数据
+            radar_info: 字典，键为雷达ID，值为该雷达的信道数量
+            time_range: 时间范围元组 (start, end)
+            save_path: 保存路径
+        """
+        fig, ax = self._create_figure("雷达信道占用率随时间变化")
+        
+        # 计算网络中总的可用信道数
+        total_channels = sum(radar_info.values())
+        
+        # 为每个算法计算每个时间步的信道占用率
+        for algo_name, history in assignment_histories.items():
+            timestamps = []
+            occupancy_rates = []
+            
+            for entry in history:
+                timestamp = entry['timestamp']
+                assignments = entry['assignments']
+                
+                # 统计当前时间步中被占用的信道数
+                occupied_channels = 0
+                for target_id, assignment in assignments.items():
+                    if assignment['radar_id'] is not None and assignment['channel_id'] is not None:
+                        occupied_channels += 1
+                
+                # 计算占用率
+                occupancy_rate = occupied_channels / total_channels if total_channels > 0 else 0
+                
+                timestamps.append(timestamp)
+                occupancy_rates.append(occupancy_rate)
+            
+            # 绘制曲线
+            ax.plot(timestamps, occupancy_rates, label=algo_name, marker='.', alpha=0.7)
+        
+        ax.set_xlim(time_range)
+        ax.set_ylim(0, 1.0)
+        ax.set_xlabel("时间")
+        ax.set_ylabel("信道占用率")
+        ax.set_title("雷达信道占用率随时间变化")
+        ax.grid(True, linestyle='--', alpha=0.7)
+        ax.legend()
+        
+        plt.tight_layout()
+        if save_path:
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            plt.savefig(save_path, bbox_inches='tight')
+            plt.close()
+        else:
+            plt.show()
+    
+    def plot_average_radar_channel_occupancy(self,
+                                         assignment_histories,
+                                         radar_info,
+                                         save_path=None):
+        """
+        绘制各算法的平均雷达信道占用率条形图。
+        
+        Args:
+            assignment_histories: 字典，键为算法名称，值为该算法的分配历史数据
+            radar_info: 字典，键为雷达ID，值为该雷达的信道数量
+            save_path: 保存路径
+        """
+        fig, ax = self._create_figure("各算法平均雷达信道占用率")
+        
+        # 计算网络中总的可用信道数
+        total_channels = sum(radar_info.values())
+        
+        # 为每个算法计算平均信道占用率
+        algo_names = []
+        avg_occupancy_rates = []
+        
+        for algo_name, history in assignment_histories.items():
+            occupancy_rates = []
+            
+            for entry in history:
+                assignments = entry['assignments']
+                
+                # 统计当前时间步中被占用的信道数
+                occupied_channels = 0
+                for target_id, assignment in assignments.items():
+                    if assignment['radar_id'] is not None and assignment['channel_id'] is not None:
+                        occupied_channels += 1
+                
+                # 计算占用率
+                occupancy_rate = occupied_channels / total_channels if total_channels > 0 else 0
+                occupancy_rates.append(occupancy_rate)
+            
+            # 计算平均占用率
+            avg_occupancy_rate = sum(occupancy_rates) / len(occupancy_rates) if occupancy_rates else 0
+            
+            algo_names.append(algo_name)
+            avg_occupancy_rates.append(avg_occupancy_rate)
+        
+        # 绘制条形图
+        bars = ax.bar(algo_names, avg_occupancy_rates, 
+                     color=[self.radar_colors[i % len(self.radar_colors)] for i in range(len(algo_names))],
+                     alpha=0.8, edgecolor='black', linewidth=0.5)
+        
+        # 在条形上方添加数值标签
+        for bar in bars:
+            height = bar.get_height()
+            ax.text(bar.get_x() + bar.get_width()/2., height + 0.01,
+                   f'{height:.2%}', ha='center', va='bottom', fontsize=10)
+        
+        ax.set_ylim(0, max(avg_occupancy_rates) * 1.2 if avg_occupancy_rates else 1.0)
+        ax.set_ylabel("平均信道占用率")
+        ax.set_title("各算法平均雷达信道占用率")
+        ax.grid(True, axis='y', linestyle='--', alpha=0.7)
+        
+        plt.tight_layout()
+        if save_path:
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            plt.savefig(save_path, bbox_inches='tight')
+            plt.close()
+        else:
+            plt.show()
+
     def plot_target_gantt(self, 
                      allocation_data, 
                      time_range,
@@ -287,6 +413,298 @@ class RadarPlotter:
         else:
             plt.show()
 
+    def plot_radar_channel_occupancy_over_time(self,
+                                           assignment_histories,
+                                           radar_info,
+                                           time_range,
+                                           save_path=None):
+        """
+        绘制随时间变化的雷达信道占用率曲线。
+        
+        Args:
+            assignment_histories: 字典，键为算法名称，值为该算法的分配历史数据
+            radar_info: 字典，键为雷达ID，值为该雷达的信道数量
+            time_range: 时间范围元组 (start, end)
+            save_path: 保存路径
+        """
+        fig, ax = self._create_figure("雷达信道占用率随时间变化")
+        
+        # 计算网络中总的可用信道数
+        total_channels = sum(radar_info.values())
+        
+        # 为每个算法计算每个时间步的信道占用率
+        for algo_name, history in assignment_histories.items():
+            timestamps = []
+            occupancy_rates = []
+            
+            for entry in history:
+                timestamp = entry['timestamp']
+                assignments = entry['assignments']
+                
+                # 统计当前时间步中被占用的信道数
+                occupied_channels = 0
+                for target_id, assignment in assignments.items():
+                    if assignment['radar_id'] is not None and assignment['channel_id'] is not None:
+                        occupied_channels += 1
+                
+                # 计算占用率
+                occupancy_rate = occupied_channels / total_channels if total_channels > 0 else 0
+                
+                timestamps.append(timestamp)
+                occupancy_rates.append(occupancy_rate)
+            
+            # 绘制曲线
+            ax.plot(timestamps, occupancy_rates, label=algo_name, marker='.', alpha=0.7)
+        
+        ax.set_xlim(time_range)
+        ax.set_ylim(0, 1.0)
+        ax.set_xlabel("时间")
+        ax.set_ylabel("信道占用率")
+        ax.set_title("雷达信道占用率随时间变化")
+        ax.grid(True, linestyle='--', alpha=0.7)
+        ax.legend()
+        
+        plt.tight_layout()
+        if save_path:
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            plt.savefig(save_path, bbox_inches='tight')
+            plt.close()
+        else:
+            plt.show()
+    
+    def plot_average_radar_channel_occupancy(self,
+                                         assignment_histories,
+                                         radar_info,
+                                         save_path=None):
+        """
+        绘制各算法的平均雷达信道占用率条形图。
+        
+        Args:
+            assignment_histories: 字典，键为算法名称，值为该算法的分配历史数据
+            radar_info: 字典，键为雷达ID，值为该雷达的信道数量
+            save_path: 保存路径
+        """
+        fig, ax = self._create_figure("各算法平均雷达信道占用率")
+        
+        # 计算网络中总的可用信道数
+        total_channels = sum(radar_info.values())
+        
+        # 为每个算法计算平均信道占用率
+        algo_names = []
+        avg_occupancy_rates = []
+        
+        for algo_name, history in assignment_histories.items():
+            occupancy_rates = []
+            
+            for entry in history:
+                assignments = entry['assignments']
+                
+                # 统计当前时间步中被占用的信道数
+                occupied_channels = 0
+                for target_id, assignment in assignments.items():
+                    if assignment['radar_id'] is not None and assignment['channel_id'] is not None:
+                        occupied_channels += 1
+                
+                # 计算占用率
+                occupancy_rate = occupied_channels / total_channels if total_channels > 0 else 0
+                occupancy_rates.append(occupancy_rate)
+            
+            # 计算平均占用率
+            avg_occupancy_rate = sum(occupancy_rates) / len(occupancy_rates) if occupancy_rates else 0
+            
+            algo_names.append(algo_name)
+            avg_occupancy_rates.append(avg_occupancy_rate)
+        
+        # 绘制条形图
+        bars = ax.bar(algo_names, avg_occupancy_rates, 
+                     color=[self.radar_colors[i % len(self.radar_colors)] for i in range(len(algo_names))],
+                     alpha=0.8, edgecolor='black', linewidth=0.5)
+        
+        # 在条形上方添加数值标签
+        for bar in bars:
+            height = bar.get_height()
+            ax.text(bar.get_x() + bar.get_width()/2., height + 0.01,
+                   f'{height:.2%}', ha='center', va='bottom', fontsize=10)
+        
+        ax.set_ylim(0, max(avg_occupancy_rates) * 1.2 if avg_occupancy_rates else 1.0)
+        ax.set_ylabel("平均信道占用率")
+        ax.set_title("各算法平均雷达信道占用率")
+        ax.grid(True, axis='y', linestyle='--', alpha=0.7)
+        
+        plt.tight_layout()
+        if save_path:
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            plt.savefig(save_path, bbox_inches='tight')
+            plt.close()
+        else:
+            plt.show()
+
+    def plot_target_radar_switching_frequency(self,
+                                              switching_data: Dict[str, int],
+                                              save_path: Optional[str] = None):
+        """
+        绘制各算法的总目标雷达切换频次对比图。
+
+        Args:
+            switching_data: 字典，键为算法名称，值为该算法的总切换次数。
+                            Example: {"BFSA-RHO": 15, "Rule-Based": 25, "LNS": 10}
+            save_path: 保存路径。
+        """
+        algo_names = list(switching_data.keys())
+        switch_counts = list(switching_data.values())
+
+        fig, ax = self._create_figure("Target Radar Switching Frequency Comparison")
+
+        bars = ax.bar(algo_names, switch_counts, color=[self.radar_colors[i % len(self.radar_colors)] for i in range(len(algo_names))])
+
+        ax.set_xlabel("Algorithm")
+        ax.set_ylabel("Total Radar Switches")
+        ax.set_title("Comparison of Total Target Radar Switching Frequency by Algorithm")
+        
+        # 在条形图上添加数值标签
+        for bar in bars:
+            yval = bar.get_height()
+            ax.text(bar.get_x() + bar.get_width()/2.0, yval + 0.05 * max(switch_counts) if max(switch_counts) > 0 else 0.5, 
+                    int(yval), ha='center', va='bottom')
+
+        plt.xticks(rotation=15, ha="right") # 如果标签重叠，旋转标签
+        plt.tight_layout()
+
+        if save_path:
+            # 确保目录存在
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            plt.savefig(save_path, bbox_inches='tight', dpi=300)
+            logging.info(f"Target radar switching frequency plot saved to {save_path}")
+            plt.close(fig) # 关闭图形，防止在某些环境中意外显示
+        else:
+            plt.show()
+
+    def plot_radar_channel_occupancy_over_time(self,
+                                           assignment_histories,
+                                           radar_info,
+                                           time_range,
+                                           save_path=None):
+        """
+        绘制随时间变化的雷达信道占用率曲线。
+        
+        Args:
+            assignment_histories: 字典，键为算法名称，值为该算法的分配历史数据
+            radar_info: 字典，键为雷达ID，值为该雷达的信道数量
+            time_range: 时间范围元组 (start, end)
+            save_path: 保存路径
+        """
+        fig, ax = self._create_figure("雷达信道占用率随时间变化")
+        
+        # 计算网络中总的可用信道数
+        total_channels = sum(radar_info.values())
+        
+        # 为每个算法计算每个时间步的信道占用率
+        for algo_name, history in assignment_histories.items():
+            timestamps = []
+            occupancy_rates = []
+            
+            for entry in history:
+                timestamp = entry['timestamp']
+                assignments = entry['assignments']
+                
+                # 统计当前时间步中被占用的信道数
+                occupied_channels = 0
+                for target_id, assignment in assignments.items():
+                    if assignment['radar_id'] is not None and assignment['channel_id'] is not None:
+                        occupied_channels += 1
+                
+                # 计算占用率
+                occupancy_rate = occupied_channels / total_channels if total_channels > 0 else 0
+                
+                timestamps.append(timestamp)
+                occupancy_rates.append(occupancy_rate)
+            
+            # 绘制曲线
+            ax.plot(timestamps, occupancy_rates, label=algo_name, marker='.', alpha=0.7)
+        
+        ax.set_xlim(time_range)
+        ax.set_ylim(0, 1.0)
+        ax.set_xlabel("时间")
+        ax.set_ylabel("信道占用率")
+        ax.set_title("雷达信道占用率随时间变化")
+        ax.grid(True, linestyle='--', alpha=0.7)
+        ax.legend()
+        
+        plt.tight_layout()
+        if save_path:
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            plt.savefig(save_path, bbox_inches='tight')
+            plt.close()
+        else:
+            plt.show()
+    
+    def plot_average_radar_channel_occupancy(self,
+                                         assignment_histories,
+                                         radar_info,
+                                         save_path=None):
+        """
+        绘制各算法的平均雷达信道占用率条形图。
+        
+        Args:
+            assignment_histories: 字典，键为算法名称，值为该算法的分配历史数据
+            radar_info: 字典，键为雷达ID，值为该雷达的信道数量
+            save_path: 保存路径
+        """
+        fig, ax = self._create_figure("各算法平均雷达信道占用率")
+        
+        # 计算网络中总的可用信道数
+        total_channels = sum(radar_info.values())
+        
+        # 为每个算法计算平均信道占用率
+        algo_names = []
+        avg_occupancy_rates = []
+        
+        for algo_name, history in assignment_histories.items():
+            occupancy_rates = []
+            
+            for entry in history:
+                assignments = entry['assignments']
+                
+                # 统计当前时间步中被占用的信道数
+                occupied_channels = 0
+                for target_id, assignment in assignments.items():
+                    if assignment['radar_id'] is not None and assignment['channel_id'] is not None:
+                        occupied_channels += 1
+                
+                # 计算占用率
+                occupancy_rate = occupied_channels / total_channels if total_channels > 0 else 0
+                occupancy_rates.append(occupancy_rate)
+            
+            # 计算平均占用率
+            avg_occupancy_rate = sum(occupancy_rates) / len(occupancy_rates) if occupancy_rates else 0
+            
+            algo_names.append(algo_name)
+            avg_occupancy_rates.append(avg_occupancy_rate)
+        
+        # 绘制条形图
+        bars = ax.bar(algo_names, avg_occupancy_rates, 
+                     color=[self.radar_colors[i % len(self.radar_colors)] for i in range(len(algo_names))],
+                     alpha=0.8, edgecolor='black', linewidth=0.5)
+        
+        # 在条形上方添加数值标签
+        for bar in bars:
+            height = bar.get_height()
+            ax.text(bar.get_x() + bar.get_width()/2., height + 0.01,
+                   f'{height:.2%}', ha='center', va='bottom', fontsize=10)
+        
+        ax.set_ylim(0, max(avg_occupancy_rates) * 1.2 if avg_occupancy_rates else 1.0)
+        ax.set_ylabel("平均信道占用率")
+        ax.set_title("各算法平均雷达信道占用率")
+        ax.grid(True, axis='y', linestyle='--', alpha=0.7)
+        
+        plt.tight_layout()
+        if save_path:
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            plt.savefig(save_path, bbox_inches='tight')
+            plt.close()
+        else:
+            plt.show()
+
     def plot_gantt_chart(self, 
                         assignments: List[csr_matrix], 
                         time_steps: List[int], 
@@ -319,103 +737,73 @@ class RadarPlotter:
         # 保存或显示图表
         self._save_or_show(save_path)
     
-    def _save_or_show(self, save_path: str) -> None:
-        """保存或显示图表"""
+    def _save_or_show(self, save_path: Optional[str], fig: Optional[plt.Figure] = None) -> None:
+        """
+        Helper function to save or show the plot.
+        If fig is None, it uses plt.gcf().
+        """
+        current_fig = fig if fig else plt.gcf()
         if save_path:
-            try:
-                # 确保目录存在
+            # 确保目录存在
+            if os.path.dirname(save_path): # Check if dirname is not empty
                 os.makedirs(os.path.dirname(save_path), exist_ok=True)
-                plt.savefig(save_path, bbox_inches='tight', dpi=300)
-                logging.info(f"Result have been saved to {save_path}")
-            except Exception as e:
-                logging.error(f"Result saved to {save_path} falied: {e}")
-            finally:
-                plt.close()
+            current_fig.savefig(save_path, bbox_inches='tight', dpi=self.dpi)
+            plt.close(current_fig)
         else:
             plt.show()
-    
-    def plot_target_switching(self, 
-                             allocation_data: List[Dict[str, Any]],
-                             target_info: Dict[str, Any],
-                             algorithm_name: str = "BFSA-Rho",
-                             save_path: Optional[str] = None) -> None:
+
+    def plot_radar_channel_occupancy_over_time(self,
+                                           assignment_histories,
+                                           radar_info,
+                                           time_range,
+                                           save_path=None):
         """
-        绘制目标切换频次图
+        绘制随时间变化的雷达信道占用率曲线。
         
         Args:
-            allocation_data: 分配结果数据
-            target_info: 目标信息
-            algorithm_name: 算法名称
-            save_path: 保存路径，如果为None则显示图表
+            assignment_histories: 字典，键为算法名称，值为该算法的分配历史数据
+            radar_info: 字典，键为雷达ID，值为该雷达的信道数量
+            time_range: 时间范围元组 (start, end)
+            save_path: 保存路径
         """
-        fig, ax = self._create_figure(f"Target radar switching frequency - {algorithm_name}")
+        fig, ax = self._create_figure("雷达信道占用率随时间变化")
         
-        # 计算每个目标的雷达切换次数
-        target_switches = {}
+        # 计算网络中总的可用信道数
+        total_channels = sum(radar_info.values())
         
-        # 从分配历史中提取目标切换数据
-        target_radar_history = {}
-        
-        # 遍历时间步骤
-        for step_data in allocation_data:
-            # 确保 step_data 是字典类型
-            if isinstance(step_data, dict) and 'timestamp' in step_data and 'assignments' in step_data:
-                timestamp = step_data['timestamp']
-                assignments = step_data['assignments']
+        # 为每个算法计算每个时间步的信道占用率
+        for algo_name, history in assignment_histories.items():
+            timestamps = []
+            occupancy_rates = []
+            
+            for entry in history:
+                timestamp = entry['timestamp']
+                assignments = entry['assignments']
                 
-                # 更新每个目标的雷达分配历史
+                # 统计当前时间步中被占用的信道数
+                occupied_channels = 0
                 for target_id, assignment in assignments.items():
-                    if target_id not in target_radar_history:
-                        target_radar_history[target_id] = []
-                    
-                    if assignment is not None and assignment['radar_id'] is not None:
-                        target_radar_history[target_id].append({
-                            'timestamp': timestamp,
-                            'radar_id': assignment['radar_id']
-                        })
-        
-        # 计算每个目标的雷达切换次数
-        for target_id, history in target_radar_history.items():
-            # 按时间戳排序
-            sorted_history = sorted(history, key=lambda x: x['timestamp'])
-            switches = 0
-            prev_radar = None
+                    if assignment['radar_id'] is not None and assignment['channel_id'] is not None:
+                        occupied_channels += 1
+                
+                # 计算占用率
+                occupancy_rate = occupied_channels / total_channels if total_channels > 0 else 0
+                
+                timestamps.append(timestamp)
+                occupancy_rates.append(occupancy_rate)
             
-            for entry in sorted_history:
-                current_radar = entry['radar_id']
-                if prev_radar is not None and current_radar != prev_radar:
-                    switches += 1
-                prev_radar = current_radar
-            
-            target_switches[target_id] = switches
+            # 绘制曲线
+            ax.plot(timestamps, occupancy_rates, label=algo_name, marker='.', alpha=0.7)
         
-        # 绘制条形图
-        target_ids = sorted(target_switches.keys())
-        switch_counts = [target_switches[tid] for tid in target_ids]
+        ax.set_xlim(time_range)
+        ax.set_ylim(0, 1.0)
+        ax.set_xlabel("时间")
+        ax.set_ylabel("信道占用率")
+        ax.set_title("雷达信道占用率随时间变化")
+        ax.grid(True, linestyle='--', alpha=0.7)
+        ax.legend()
         
-        bars = ax.bar([f"Target {tid}" for tid in target_ids], switch_counts, color='skyblue', edgecolor='navy')
-        
-        # 添加数值标签
-        for bar, count in zip(bars, switch_counts):
-            height = bar.get_height()
-            ax.text(bar.get_x() + bar.get_width()/2., height + 0.1,
-                   f'{count}',
-                   ha='center', va='bottom')
-        
-        # 设置坐标轴标签
-        ax.set_xlabel('Targets')
-        ax.set_ylabel('Radar switch counts')
-        
-        # 添加平均切换次数线
-        if target_switches:  # 确保有数据再计算平均值
-            avg_switches = np.mean(list(target_switches.values()))
-            ax.axhline(y=avg_switches, color='red', linestyle='--', alpha=0.7)
-            ax.text(len(target_ids) - 0.5, avg_switches + 0.2, f'avarage: {avg_switches:.2f}', color='red')
-        
-        # 调整布局
         plt.tight_layout()
-        
-        # 保存或显示图表
         if save_path:
             os.makedirs(os.path.dirname(save_path), exist_ok=True)
             plt.savefig(save_path, bbox_inches='tight')
@@ -423,48 +811,561 @@ class RadarPlotter:
         else:
             plt.show()
     
-    def plot_convergence_curve(self, 
+    def plot_average_radar_channel_occupancy(self,
+                                         assignment_histories,
+                                         radar_info,
+                                         save_path=None):
+        """
+        绘制各算法的平均雷达信道占用率条形图。
+        
+        Args:
+            assignment_histories: 字典，键为算法名称，值为该算法的分配历史数据
+            radar_info: 字典，键为雷达ID，值为该雷达的信道数量
+            save_path: 保存路径
+        """
+        fig, ax = self._create_figure("各算法平均雷达信道占用率")
+        
+        # 计算网络中总的可用信道数
+        total_channels = sum(radar_info.values())
+        
+        # 为每个算法计算平均信道占用率
+        algo_names = []
+        avg_occupancy_rates = []
+        
+        for algo_name, history in assignment_histories.items():
+            occupancy_rates = []
+            
+            for entry in history:
+                assignments = entry['assignments']
+                
+                # 统计当前时间步中被占用的信道数
+                occupied_channels = 0
+                for target_id, assignment in assignments.items():
+                    if assignment['radar_id'] is not None and assignment['channel_id'] is not None:
+                        occupied_channels += 1
+                
+                # 计算占用率
+                occupancy_rate = occupied_channels / total_channels if total_channels > 0 else 0
+                occupancy_rates.append(occupancy_rate)
+            
+            # 计算平均占用率
+            avg_occupancy_rate = sum(occupancy_rates) / len(occupancy_rates) if occupancy_rates else 0
+            
+            algo_names.append(algo_name)
+            avg_occupancy_rates.append(avg_occupancy_rate)
+        
+        # 绘制条形图
+        bars = ax.bar(algo_names, avg_occupancy_rates, 
+                     color=[self.radar_colors[i % len(self.radar_colors)] for i in range(len(algo_names))],
+                     alpha=0.8, edgecolor='black', linewidth=0.5)
+        
+        # 在条形上方添加数值标签
+        for bar in bars:
+            height = bar.get_height()
+            ax.text(bar.get_x() + bar.get_width()/2., height + 0.01,
+                   f'{height:.2%}', ha='center', va='bottom', fontsize=10)
+        
+        ax.set_ylim(0, max(avg_occupancy_rates) * 1.2 if avg_occupancy_rates else 1.0)
+        ax.set_ylabel("平均信道占用率")
+        ax.set_title("各算法平均雷达信道占用率")
+        ax.grid(True, axis='y', linestyle='--', alpha=0.7)
+        
+        plt.tight_layout()
+        if save_path:
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            plt.savefig(save_path, bbox_inches='tight')
+            plt.close()
+        else:
+            plt.show()
+    
+    def plot_target_switching(self,
+                              algorithms_switch_data: Dict[str, List[Dict[str, Any]]], # Key: algo_name, Value: list of switch events
+                              target_info: Dict[str, Any], # target_info is {target_id: target_details}
+                              save_path: Optional[str] = None) -> None:
+        """
+        绘制目标切换频次图 (多算法对比)
+        
+        Args:
+            algorithms_switch_data: 字典，键为算法名称，值为该算法的切换事件列表。
+                                    每个切换事件是一个字典，例如 {'target_id': tid, 'radar_id': rid, 'start_time': ts}
+            target_info: 目标信息字典，键为目标ID。
+            save_path: 保存路径，如果为None则显示图表
+        """
+        fig, ax = self._create_figure("Target Radar Switching Frequency Comparison") # 通用标题
+        
+        all_target_ids = sorted([str(tid) for tid in target_info.keys()]) # 获取所有唯一的目标ID
+        if not all_target_ids:
+            logging.warning("No target information provided for switching plot.")
+            if save_path:
+                # Ensure directory exists even for an empty plot
+                if os.path.dirname(save_path):
+                    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+                else: # Handle case where save_path is just a filename in current dir
+                    pass 
+                ax.text(0.5, 0.5, "No target data", ha='center', va='center')
+                plt.savefig(save_path, bbox_inches='tight')
+                plt.close(fig)
+            else:
+                plt.show() # 或直接返回
+            return
+
+        num_algorithms = len(algorithms_switch_data)
+        if num_algorithms == 0:
+            logging.warning("No algorithm data provided for switching plot.")
+            if save_path:
+                if os.path.dirname(save_path):
+                    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+                ax.text(0.5, 0.5, "No algorithm data", ha='center', va='center')
+                plt.savefig(save_path, bbox_inches='tight')
+                plt.close(fig)
+            else:
+                plt.show() # 或直接返回
+            return
+
+        algorithm_names = list(algorithms_switch_data.keys())
+        
+        # 计算每个算法和每个目标的切换次数
+        switches_by_algo_target = {algo: {} for algo in algorithm_names}
+
+        for algo_name, switch_data_list in algorithms_switch_data.items():
+            target_radar_history_for_algo = {} # {target_id: [{'timestamp': ts, 'radar_id': rid}]}
+            for record in switch_data_list:
+                target_id = str(record['target_id']) 
+                if target_id not in target_radar_history_for_algo:
+                    target_radar_history_for_algo[target_id] = []
+                target_radar_history_for_algo[target_id].append({
+                    'timestamp': record['start_time'], # Using 'start_time' as the timestamp for sorting
+                    'radar_id': record['radar_id']
+                })
+                
+            current_algo_switches = {} # {target_id: count}
+            for target_id, history in target_radar_history_for_algo.items():
+                sorted_history = sorted(history, key=lambda x: x['timestamp'])
+                switches = 0
+                prev_radar = None
+                for entry in sorted_history:
+                    current_radar = entry['radar_id']
+                    if prev_radar is not None and current_radar != prev_radar:
+                        switches += 1
+                    prev_radar = current_radar
+                current_algo_switches[target_id] = switches
+            switches_by_algo_target[algo_name] = current_algo_switches
+
+        # 绘制分组条形图
+        num_targets = len(all_target_ids)
+        bar_width = 0.8 / num_algorithms 
+        index = np.arange(num_targets)
+
+        for i, algo_name in enumerate(algorithm_names):
+            algo_switch_counts = [switches_by_algo_target[algo_name].get(tid, 0) for tid in all_target_ids]
+            
+            bars = ax.bar(index + i * bar_width, algo_switch_counts, bar_width, 
+                          label=algo_name, 
+                          color=plt.cm.tab10(i % 10), 
+                          edgecolor='black')
+            
+            for bar in bars:
+                height = bar.get_height()
+                ax.text(bar.get_x() + bar.get_width() / 2., height + 0.05,
+                        f'{height}',
+                        ha='center', va='bottom', fontsize=8)
+
+        ax.set_xlabel('Targets')
+        ax.set_ylabel('Radar Switch Counts')
+        ax.set_xticks(index + bar_width * (num_algorithms - 1) / 2)
+        ax.set_xticklabels([f"Target {tid}" for tid in all_target_ids], rotation=45, ha="right")
+        ax.legend(title="Algorithms")
+        
+        plt.tight_layout()
+        self._save_or_show(save_path)
+    
+    def plot_convergence_curve(self,
                               convergence_data: Dict[str, List[float]],
                               save_path: Optional[str] = None) -> None:
         """
         绘制算法收敛曲线
         
         Args:
-            convergence_data: 收敛数据，格式为 {算法名称: [迭代1的目标函数值, 迭代2的目标函数值, ...]}
+            convergence_data: 收敛数据，格式为 {算法名称: [每时间步的覆盖率值, ...]}
             save_path: 保存路径，如果为None则显示图表
         """
         fig, ax = self._create_figure("Comparison of algorithm convergence curves")
         
+        if not convergence_data or all(not v for v in convergence_data.values()):
+            logging.warning("No convergence data provided or all data lists are empty. Skipping plot.")
+            ax.text(0.5, 0.5, "No data available for convergence plot",
+                    ha='center', va='center', transform=ax.transAxes, fontsize=12)
+            self._save_or_show(save_path)
+            if not save_path: # 如果仅显示，确保关闭图形
+                 plt.close(fig)
+            return
+
+        plotted_something = False
+        all_max_values_from_plots = []
+        
         # 绘制每个算法的收敛曲线
         for i, (algorithm, values) in enumerate(convergence_data.items()):
-            iterations = list(range(1, len(values) + 1))
-            ax.plot(iterations, values, marker='o', markersize=4, label=algorithm, 
+            if not values:
+                logging.info(f"Skipping convergence plot for {algorithm} as its data list is empty.")
+                continue
+            
+            # iterations 实际上代表时间步
+            timesteps_for_plot = list(range(1, len(values) + 1)) # X轴从1开始
+            ax.plot(timesteps_for_plot, values, marker='o', markersize=4, label=algorithm,
                    color=plt.cm.tab10.colors[i % 10], linewidth=2)
+            all_max_values_from_plots.append(max(values))
+            plotted_something = True
         
+        if not plotted_something:
+            logging.warning("No valid algorithm data was plotted for convergence.")
+            ax.text(0.5, 0.5, "No valid data to plot after filtering",
+                    ha='center', va='center', transform=ax.transAxes, fontsize=12)
+            self._save_or_show(save_path)
+            if not save_path: # 如果仅显示，确保关闭图形
+                 plt.close(fig)
+            return
+
         # 设置坐标轴标签
-        ax.set_xlabel('Iterations')
-        ax.set_ylabel('Tracking coverage (tracking time/total time the target is in the radiation range)')
+        ax.set_xlabel('Timesteps') # 标签改为 Timesteps，更准确
+        ax.set_ylabel('Tracking Coverage Ratio') # 标签简化，更清晰
         
         # 设置Y轴范围，从0到1或略高于最大值
-        max_value = max([max(values) for values in convergence_data.values()])
-        ax.set_ylim(0, max(1.0, max_value * 1.05))
+        max_y_val = 0.0
+        if all_max_values_from_plots: # 确保列表非空
+            max_y_val = max(all_max_values_from_plots)
         
-        # 添加网格
+        ax.set_ylim(0, max(1.0, max_y_val * 1.05)) # 确保Y轴至少为0到1
+        
+        # 添加网格和图例
+        ax.grid(True, linestyle='--', alpha=0.7)
+        ax.legend(loc='best') # 使用 'best' 位置
+        
+        plt.tight_layout()
+        self._save_or_show(save_path)
+        if not save_path: # 如果仅显示，确保关闭图形
+            plt.close(fig)
+    def plot_target_assignment_rate_over_time(self,
+                                              assignment_rate_data: Dict[str, List[float]],
+                                              save_path: Optional[str] = None) -> None:
+        """
+        绘制不同算法的目标分配率随时间变化的曲线 (仅使用线条)
+        
+        Args:
+            assignment_rate_data: 分配率数据，格式为 {算法名称: [每时间步的分配率值, ...]}
+            save_path: 保存路径，如果为None则显示图表
+        """
+        # Construct title dynamically
+        algo_names = list(assignment_rate_data.keys())
+        if len(algo_names) > 0:
+            title_str = "Assigned Ratio Comparison: " + " vs ".join(algo_names)
+        else:
+            title_str = "Assigned Ratio Comparison"
+        fig, ax = self._create_figure(title_str) # _create_figure uses fig.suptitle
+        
+        if not assignment_rate_data or all(not v for v in assignment_rate_data.values()):
+            logging.warning("No assignment rate data provided or all data lists are empty. Skipping plot.")
+            ax.text(0.5, 0.5, "No data available for assignment rate plot",
+                    ha='center', va='center', transform=ax.transAxes, fontsize=12)
+            self._save_or_show(save_path, fig)
+            return
+
+        plotted_something = False
+
+        # 为特定算法定义线条样式
+        algorithm_specific_linestyles = {
+            "BFSA-RHO": '-',   # 实线
+            "Rule-Based": '--', # 虚线
+            "LNS": ':'         # 点线
+        }
+        default_linestyle = '-.' # 其他算法的默认线型 (点划线)
+        
+        # 绘制每个算法的分配率曲线
+        for i, (algorithm, values) in enumerate(assignment_rate_data.items()):
+            if not values:
+                logging.info(f"Skipping assignment rate plot for {algorithm} as its data list is empty.")
+                continue
+            
+            timesteps_for_plot = list(range(len(values))) # X轴从0到T
+
+            linestyle_to_use = algorithm_specific_linestyles.get(algorithm, default_linestyle)
+
+            ax.plot(timesteps_for_plot, values,
+                    linestyle=linestyle_to_use,  # 应用线条样式
+                    label=algorithm,
+                    color=plt.cm.tab10.colors[i % 10], # 保持颜色循环
+                    linewidth=2) # 线条宽度
+            plotted_something = True
+        
+        if not plotted_something:
+            logging.warning("No valid algorithm data was plotted for assignment rate.")
+            ax.text(0.5, 0.5, "No valid data to plot after filtering",
+                    ha='center', va='center', transform=ax.transAxes, fontsize=12)
+            self._save_or_show(save_path, fig)
+            return
+
+        # 设置坐标轴标签
+        ax.set_xlabel('Timestamp')
+        ax.set_ylabel('Assigned Ratio (Assigned / Total)')
+        
+        # 设置Y轴范围，固定为 0 到 1.1
+        ax.set_ylim(0, 1.1)
+        
+        # 添加网格和图例
+        ax.grid(True, linestyle='--', alpha=0.7)
+        ax.legend(loc='best') 
+        
+        # 调整布局，在图表顶部留出4%的边距以容纳标题
+        plt.tight_layout(rect=[0, 0, 1, 0.96]) 
+        self._save_or_show(save_path, fig)
+
+    def plot_average_target_assignment_rate(self,
+                                            assignment_rate_data: Dict[str, List[float]],
+                                            save_path: Optional[str] = None) -> None:
+        """
+        绘制不同算法的平均目标分配率对比柱状图。
+
+        Args:
+            assignment_rate_data: 字典，键为算法名称，值为每个时间步的分配率列表。
+                                  例如: {"BFSA-RHO": [0.8, 0.85], "Rule-Based": [0.7, 0.75]}
+            save_path: 保存路径，如果为None则显示图表。
+        """
+        fig, ax = self._create_figure("Average Target Assignment Rate Comparison")
+
+        if not assignment_rate_data or all(not v for v in assignment_rate_data.values()):
+            logging.warning("No data for average target assignment rate plot.")
+            ax.text(0.5, 0.5, "No data available", ha='center', va='center')
+            self._save_or_show(save_path, fig=fig)
+            if not save_path:
+                plt.close(fig)
+            return
+
+        algorithms = []
+        average_rates = []
+
+        for algo_name, rates in assignment_rate_data.items():
+            if rates: # 确保列表不为空
+                algorithms.append(algo_name)
+                average_rates.append(np.mean(rates))
+            else:
+                logging.info(f"Skipping average calculation for {algo_name} due to empty rate list.")
+        
+        if not algorithms: # 如果所有算法的数据都为空或处理后没有有效数据
+            logging.warning("No valid data to plot for average target assignment rate.")
+            ax.text(0.5, 0.5, "No valid data to plot", ha='center', va='center')
+            self._save_or_show(save_path, fig=fig)
+            if not save_path:
+                plt.close(fig)
+            return
+
+        bars = ax.bar(algorithms, average_rates, color=[plt.cm.tab10(i % 10) for i in range(len(algorithms))], edgecolor='black')
+
+        ax.set_xlabel("Algorithms")
+        ax.set_ylabel("Average Target Assignment Rate")
+        ax.set_ylim(0, 1.1) # Y轴范围0到1.1，以便显示顶部的文本
+        ax.grid(True, axis='y', linestyle='--', alpha=0.7)
+
+        # 在柱状图顶部显示具体数值
+        for bar in bars:
+            yval = bar.get_height()
+            plt.text(bar.get_x() + bar.get_width()/2.0, yval + 0.01, f'{yval:.3f}', ha='center', va='bottom')
+
+        plt.tight_layout()
+        self._save_or_show(save_path, fig=fig)
+        if not save_path: # 如果仅显示，确保关闭图形
+            plt.close(fig)
+
+    def plot_assignment_rates_comparison(self,
+                                         assignment_rate_data: Dict[str, List[float]],
+                                         time_steps: List[int],
+                                         title: str = "Comparison of Target Assignment Rates", # 更新默认标题为英文
+                                         save_path: Optional[str] = None):
+        """
+        绘制多种算法的目标分配率对比图。
+        风格与参考图片 /c:/Users/reznovlee/Desktop/radar_code/radar/output/scenario-2025-05-18/visualization/assignment_rates_comparison.png 一致：
+        使用 'ggplot' 样式，线条带有 'o' 标记，英文标题和轴标签。
+
+        Args:
+            assignment_rate_data: 字典，键为算法名称，值为分配率列表.
+            time_steps: 时间步列表.
+            title: 图表标题.
+            save_path: 保存路径，如果为None则显示图表.
+        """
+        fig, ax = self._create_figure(title)
+
+        line_style = '-'
+        marker_style = 'o'
+        line_width = 1.5  # 可以根据实际效果调整线条宽度
+
+        # 'ggplot' 样式会自动处理颜色循环
+        for algo_name, rates in assignment_rate_data.items():
+            ax.plot(time_steps, rates, label=algo_name,
+                    marker=marker_style,
+                    linestyle=line_style,
+                    linewidth=line_width)
+
+        ax.set_xlabel("Time Step")  # 更新X轴标签为英文
+        ax.set_ylabel("Assignment Rate")  # 更新Y轴标签为英文
+        
+        ax.legend(loc='best')  # 显示图例，'best' 会自动选择最佳位置
+        
+        # 'ggplot' 样式通常包含网格, 这里明确设置以确保风格一致
         ax.grid(True, linestyle='--', alpha=0.7)
         
-        # 添加图例
-        ax.legend(loc='lower right')
+        # 设置Y轴范围，确保至少覆盖0.0到1.0
+        min_display_rate = 0.0
+        max_display_rate = 1.0
+        if assignment_rate_data:
+            all_rates_flat = [rate for rates_list in assignment_rate_data.values() for rate in rates_list]
+            if all_rates_flat: # 确保有数据
+                # 实际数据中的最小值和最大值
+                actual_min_rate = min(all_rates_flat)
+                actual_max_rate = max(all_rates_flat)
+                # 更新显示范围以包含所有数据点，同时保持0-1的基本范围
+                min_display_rate = min(min_display_rate, actual_min_rate)
+                max_display_rate = max(max_display_rate, actual_max_rate)
+
+        # 给Y轴顶部留一些空间
+        ax.set_ylim(min_display_rate, max_display_rate * 1.05 if max_display_rate > 0 else 0.1)
+
+        plt.tight_layout()  # 自动调整子图参数，使之填充整个图像区域
+        if save_path:
+            # 确保输出目录存在
+            output_dir = os.path.dirname(save_path)
+            if output_dir: # 检查目录名是否为空
+                 os.makedirs(output_dir, exist_ok=True)
+            
+            plt.savefig(save_path, dpi=self.dpi, bbox_inches='tight')
+            plt.close(fig)  # 保存后关闭图形，释放内存
+            logging.info(f"Saved assignment rates comparison chart to {save_path}")
+        else:
+            plt.show()
+
+    def plot_radar_channel_occupancy_over_time(self,
+                                           assignment_histories,
+                                           radar_info,
+                                           time_range,
+                                           save_path=None):
+        """
+        绘制随时间变化的雷达信道占用率曲线。
         
-        # 调整布局
+        Args:
+            assignment_histories: 字典，键为算法名称，值为该算法的分配历史数据
+            radar_info: 字典，键为雷达ID，值为该雷达的信道数量
+            time_range: 时间范围元组 (start, end)
+            save_path: 保存路径
+        """
+        fig, ax = self._create_figure("雷达信道占用率随时间变化")
+        
+        # 计算网络中总的可用信道数
+        total_channels = sum(radar_info.values())
+        
+        # 为每个算法计算每个时间步的信道占用率
+        for algo_name, history in assignment_histories.items():
+            timestamps = []
+            occupancy_rates = []
+            
+            for entry in history:
+                timestamp = entry['timestamp']
+                assignments = entry['assignments']
+                
+                # 统计当前时间步中被占用的信道数
+                occupied_channels = 0
+                for target_id, assignment in assignments.items():
+                    if assignment['radar_id'] is not None and assignment['channel_id'] is not None:
+                        occupied_channels += 1
+                
+                # 计算占用率
+                occupancy_rate = occupied_channels / total_channels if total_channels > 0 else 0
+                
+                timestamps.append(timestamp)
+                occupancy_rates.append(occupancy_rate)
+            
+            # 绘制曲线
+            ax.plot(timestamps, occupancy_rates, label=algo_name, marker='.', alpha=0.7)
+        
+        ax.set_xlim(time_range)
+        ax.set_ylim(0, 1.0)
+        ax.set_xlabel("时间")
+        ax.set_ylabel("信道占用率")
+        ax.set_title("雷达信道占用率随时间变化")
+        ax.grid(True, linestyle='--', alpha=0.7)
+        ax.legend()
+        
         plt.tight_layout()
-        
-        # 保存或显示图表
         if save_path:
             os.makedirs(os.path.dirname(save_path), exist_ok=True)
             plt.savefig(save_path, bbox_inches='tight')
             plt.close()
         else:
             plt.show()
+    
+    def plot_average_radar_channel_occupancy(self,
+                                         assignment_histories,
+                                         radar_info,
+                                         save_path=None):
+        """
+        绘制各算法的平均雷达信道占用率条形图。
+        
+        Args:
+            assignment_histories: 字典，键为算法名称，值为该算法的分配历史数据
+            radar_info: 字典，键为雷达ID，值为该雷达的信道数量
+            save_path: 保存路径
+        """
+        fig, ax = self._create_figure("各算法平均雷达信道占用率")
+        
+        # 计算网络中总的可用信道数
+        total_channels = sum(radar_info.values())
+        
+        # 为每个算法计算平均信道占用率
+        algo_names = []
+        avg_occupancy_rates = []
+        
+        for algo_name, history in assignment_histories.items():
+            occupancy_rates = []
+            
+            for entry in history:
+                assignments = entry['assignments']
+                
+                # 统计当前时间步中被占用的信道数
+                occupied_channels = 0
+                for target_id, assignment in assignments.items():
+                    if assignment['radar_id'] is not None and assignment['channel_id'] is not None:
+                        occupied_channels += 1
+                
+                # 计算占用率
+                occupancy_rate = occupied_channels / total_channels if total_channels > 0 else 0
+                occupancy_rates.append(occupancy_rate)
+            
+            # 计算平均占用率
+            avg_occupancy_rate = sum(occupancy_rates) / len(occupancy_rates) if occupancy_rates else 0
+            
+            algo_names.append(algo_name)
+            avg_occupancy_rates.append(avg_occupancy_rate)
+        
+        # 绘制条形图
+        bars = ax.bar(algo_names, avg_occupancy_rates, 
+                     color=[self.radar_colors[i % len(self.radar_colors)] for i in range(len(algo_names))],
+                     alpha=0.8, edgecolor='black', linewidth=0.5)
+        
+        # 在条形上方添加数值标签
+        for bar in bars:
+            height = bar.get_height()
+            ax.text(bar.get_x() + bar.get_width()/2., height + 0.01,
+                   f'{height:.2%}', ha='center', va='bottom', fontsize=10)
+        
+        ax.set_ylim(0, max(avg_occupancy_rates) * 1.2 if avg_occupancy_rates else 1.0)
+        ax.set_ylabel("平均信道占用率")
+        ax.set_title("各算法平均雷达信道占用率")
+        ax.grid(True, axis='y', linestyle='--', alpha=0.7)
+        
+        plt.tight_layout()
+        if save_path:
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            plt.savefig(save_path, bbox_inches='tight')
+            plt.close()
+        else:
+            plt.show()
+
     
     def plot_boxplot(self, 
                     performance_data: Dict[str, List[float]],
@@ -518,57 +1419,197 @@ class RadarPlotter:
             plt.close()
         else:
             plt.show()
-    
-    def plot_algorithm_comparison(self, 
-                                 algorithms: List[str],
-                                 metrics: Dict[str, Dict[str, float]],
-                                 save_path: Optional[str] = None) -> None:
+
+    def plot_radar_channel_occupancy_over_time(self,
+                                           assignment_histories,
+                                           radar_info,
+                                           time_range,
+                                           save_path=None):
         """
-        绘制算法综合性能对比图
+        绘制随时间变化的雷达信道占用率曲线。
         
         Args:
-            algorithms: 算法名称列表
-            metrics: 性能指标，格式为 {指标名称: {算法名称: 性能值}}
-            save_path: 保存路径，如果为None则显示图表
+            assignment_histories: 字典，键为算法名称，值为该算法的分配历史数据
+            radar_info: 字典，键为雷达ID，值为该雷达的信道数量
+            time_range: 时间范围元组 (start, end)
+            save_path: 保存路径
         """
-        # 设置雷达图的角度
-        num_metrics = len(metrics)
-        angles = np.linspace(0, 2*np.pi, num_metrics, endpoint=False).tolist()
-        angles += angles[:1]  # 闭合雷达图
+        fig, ax = self._create_figure("雷达信道占用率随时间变化")
         
-        fig, ax = plt.subplots(figsize=self.figsize, dpi=self.dpi, subplot_kw=dict(polar=True))
+        # 计算网络中总的可用信道数
+        total_channels = sum(radar_info.values())
         
-        # 准备标签
-        labels = list(metrics.keys())
-        labels += labels[:1]  # 闭合标签
-        
-        # 绘制每个算法的雷达图
-        for i, algorithm in enumerate(algorithms):
-            values = [metrics[metric][algorithm] for metric in metrics.keys()]
-            values += values[:1]  # 闭合数值
+        # 为每个算法计算每个时间步的信道占用率
+        for algo_name, history in assignment_histories.items():
+            timestamps = []
+            occupancy_rates = []
             
-            ax.plot(angles, values, linewidth=2, label=algorithm, color=plt.cm.tab10.colors[i % 10])
-            ax.fill(angles, values, alpha=0.1, color=plt.cm.tab10.colors[i % 10])
+            for entry in history:
+                timestamp = entry['timestamp']
+                assignments = entry['assignments']
+                
+                # 统计当前时间步中被占用的信道数
+                occupied_channels = 0
+                for target_id, assignment in assignments.items():
+                    if assignment['radar_id'] is not None and assignment['channel_id'] is not None:
+                        occupied_channels += 1
+                
+                # 计算占用率
+                occupancy_rate = occupied_channels / total_channels if total_channels > 0 else 0
+                
+                timestamps.append(timestamp)
+                occupancy_rates.append(occupancy_rate)
+            
+            # 绘制曲线
+            ax.plot(timestamps, occupancy_rates, label=algo_name, marker='.', alpha=0.7)
         
-        # 设置标签
-        ax.set_thetagrids(np.degrees(angles[:-1]), labels[:-1])
+        ax.set_xlim(time_range)
+        ax.set_ylim(0, 1.0)
+        ax.set_xlabel("时间")
+        ax.set_ylabel("信道占用率")
+        ax.set_title("雷达信道占用率随时间变化")
+        ax.grid(True, linestyle='--', alpha=0.7)
+        ax.legend()
         
-        # 添加图例
-        ax.legend(loc='upper right', bbox_to_anchor=(0.1, 0.1))
-        
-        # 设置标题
-        plt.title("Comparison of comprehensive performance of algorithms", size=15, y=1.1)
-        
-        # 调整布局
         plt.tight_layout()
-        
-        # 保存或显示图表
         if save_path:
             os.makedirs(os.path.dirname(save_path), exist_ok=True)
             plt.savefig(save_path, bbox_inches='tight')
             plt.close()
         else:
             plt.show()
+    
+    def plot_average_radar_channel_occupancy(self,
+                                         assignment_histories,
+                                         radar_info,
+                                         save_path=None):
+        """
+        绘制各算法的平均雷达信道占用率条形图。
+        
+        Args:
+            assignment_histories: 字典，键为算法名称，值为该算法的分配历史数据
+            radar_info: 字典，键为雷达ID，值为该雷达的信道数量
+            save_path: 保存路径
+        """
+        fig, ax = self._create_figure("各算法平均雷达信道占用率")
+        
+        # 计算网络中总的可用信道数
+        total_channels = sum(radar_info.values())
+        
+        # 为每个算法计算平均信道占用率
+        algo_names = []
+        avg_occupancy_rates = []
+        
+        for algo_name, history in assignment_histories.items():
+            occupancy_rates = []
+            
+            for entry in history:
+                assignments = entry['assignments']
+                
+                # 统计当前时间步中被占用的信道数
+                occupied_channels = 0
+                for target_id, assignment in assignments.items():
+                    if assignment['radar_id'] is not None and assignment['channel_id'] is not None:
+                        occupied_channels += 1
+                
+                # 计算占用率
+                occupancy_rate = occupied_channels / total_channels if total_channels > 0 else 0
+                occupancy_rates.append(occupancy_rate)
+            
+            # 计算平均占用率
+            avg_occupancy_rate = sum(occupancy_rates) / len(occupancy_rates) if occupancy_rates else 0
+            
+            algo_names.append(algo_name)
+            avg_occupancy_rates.append(avg_occupancy_rate)
+        
+        # 绘制条形图
+        bars = ax.bar(algo_names, avg_occupancy_rates, 
+                     color=[self.radar_colors[i % len(self.radar_colors)] for i in range(len(algo_names))],
+                     alpha=0.8, edgecolor='black', linewidth=0.5)
+        
+        # 在条形上方添加数值标签
+        for bar in bars:
+            height = bar.get_height()
+            ax.text(bar.get_x() + bar.get_width()/2., height + 0.01,
+                   f'{height:.2%}', ha='center', va='bottom', fontsize=10)
+        
+        ax.set_ylim(0, max(avg_occupancy_rates) * 1.2 if avg_occupancy_rates else 1.0)
+        ax.set_ylabel("平均信道占用率")
+        ax.set_title("各算法平均雷达信道占用率")
+        ax.grid(True, axis='y', linestyle='--', alpha=0.7)
+        
+        plt.tight_layout()
+        if save_path:
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            plt.savefig(save_path, bbox_inches='tight')
+            plt.close()
+        else:
+            plt.show()
+    
+    def plot_algorithm_comparison(self, 
+                                 algorithms: List[str], 
+                                 performance_metrics: Dict[str, Dict[str, float]],
+                                 save_path: Optional[str] = None) -> None:
+        """
+        绘制雷达图比较多个算法的综合性能
+        
+        Args:
+            algorithms: 算法名称列表
+            performance_metrics: 性能指标数据，格式为 {指标名称: {算法名称: 值}}
+            save_path: 保存路径，如果为None则显示图表
+        """
+        if not algorithms or not performance_metrics:
+            logging.warning("No algorithms or performance metrics provided for radar chart.")
+            if save_path:
+                # Create an empty plot or a plot with a warning message
+                fig, ax = self._create_figure("Algorithm Performance Comparison (No Data)")
+                ax.text(0.5, 0.5, "No data to display", horizontalalignment='center', verticalalignment='center')
+                if os.path.dirname(save_path):
+                    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+                plt.savefig(save_path, bbox_inches='tight')
+                plt.close(fig)
+            return
+
+        metric_names = list(performance_metrics.keys())
+        num_metrics = len(metric_names)
+        
+        if num_metrics == 0:
+            logging.warning("No metric names found in performance_metrics for radar chart.")
+            if save_path:
+                fig, ax = self._create_figure("Algorithm Performance Comparison (No Metrics)")
+                ax.text(0.5, 0.5, "No metrics to display", horizontalalignment='center', verticalalignment='center')
+                if os.path.dirname(save_path):
+                    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+                plt.savefig(save_path, bbox_inches='tight')
+                plt.close(fig)
+            return
+
+        angles = np.linspace(0, 2 * np.pi, num_metrics, endpoint=False).tolist()
+        angles += angles[:1]  #闭合
+
+        fig, ax = plt.subplots(figsize=(10, 10), subplot_kw=dict(polar=True), dpi=self.dpi)
+        fig.suptitle("Algorithm Performance Comparison", fontsize=16)
+
+        ax.set_xticks(angles[:-1])
+        ax.set_xticklabels(metric_names)
+        ax.set_yticks(np.arange(0, 1.1, 0.2)) # Y轴刻度从0到1
+        ax.set_ylim(0, 1.05) # Y轴范围
+
+        for i, algorithm_name in enumerate(algorithms):
+            values = []
+            for metric in metric_names:
+                # Ensure the algorithm exists for the metric, otherwise default to 0 or handle as needed
+                values.append(performance_metrics.get(metric, {}).get(algorithm_name, 0.0))
+            
+            values += values[:1] # 闭合
+            
+            ax.plot(angles, values, linewidth=2, linestyle='solid', label=algorithm_name, color=plt.cm.tab10(i % 10))
+            ax.fill(angles, values, alpha=0.25, color=plt.cm.tab10(i % 10))
+
+        ax.legend(loc='upper right', bbox_to_anchor=(0.1, 0.1))
+        plt.tight_layout(rect=[0, 0, 1, 0.96]) # Adjust layout to make space for suptitle
+        
+        self._save_or_show(save_path)
     
     def plot_all_metrics(self, 
                         results: Dict[str, Any],
@@ -633,17 +1674,19 @@ class RadarPlotter:
             save_path=f"{output_dir}/algorithm_comparison.png"
         )
 
-    def plot_radar_utilization_heatmap(self, 
-                                  assignment_history, 
-                                  radar_info,
-                                  time_range,
-                                  algorithm_name="",
-                                  save_path=None):
+    def plot_radar_utilization_heatmap(
+        self,
+        allocation_history: List[Dict[str, Any]],
+        radar_info: Dict[int, int],  # radar_id -> num_channels
+        time_range,
+        algorithm_name="",
+        save_path=None
+    ):
         """
         绘制雷达利用率热力图
         
         Args:
-            assignment_history: 分配历史数据
+            allocation_history: 分配历史数据 (原为 assignment_history，已修正)
             radar_info: 雷达信息字典
             time_range: 时间范围元组 (start, end)
             algorithm_name: 算法名称
@@ -655,9 +1698,9 @@ class RadarPlotter:
             radar_ids = sorted(radar_info.keys())
         else:
             # 如果radar_info不是字典，那么它可能是时间范围
-            # 此时需要从assignment_history中提取雷达ID
+            # 此时需要从allocation_history中提取雷达ID
             radar_ids = []
-            for step in assignment_history:
+            for step in allocation_history: # MODIFIED: assignment_history -> allocation_history
                 for _, assignment in step['assignments'].items():
                     if assignment is not None and assignment['radar_id'] is not None:
                         if assignment['radar_id'] not in radar_ids:
@@ -667,19 +1710,20 @@ class RadarPlotter:
             # 如果time_range是None，则使用radar_info作为time_range
             if time_range is None:
                 time_range = radar_info
+
         
         time_steps = int(time_range[1] - time_range[0]) + 1
         utilization_matrix = np.zeros((len(radar_ids), time_steps))
         
         # 计算每个时间步每个雷达的利用率
-        for step in assignment_history:
+        for step in allocation_history: # MODIFIED: assignment_history -> allocation_history
             t = int(step['timestamp'] - time_range[0])
             if t < 0 or t >= time_steps:
                 continue
                 
             # 统计每个雷达分配的通道数
             radar_channel_count = {rid: 0 for rid in radar_ids}
-            radar_total_channels = {rid: 0 for rid in radar_ids}
+            # radar_total_channels = {rid: 0 for rid in radar_ids} # This line seems unused, can be kept or removed
             
             for _, assignment in step['assignments'].items():
                 if assignment is not None and assignment['radar_id'] is not None:
@@ -694,12 +1738,16 @@ class RadarPlotter:
                     total_channels = radar_info[rid]
                 else:
                     # 否则假设每个雷达有4个通道（默认值）
-                    total_channels = 4
+                    # This default might need review based on actual radar_info structure when it's not a dict
+                    total_channels = 4 # Default, consider if this logic is robust
                     
-                if radar_channel_count[rid] > 0:
+                if total_channels > 0: # Avoid division by zero
                     utilization_matrix[i, t] = radar_channel_count[rid] / total_channels
+                else:
+                    utilization_matrix[i, t] = 0.0
         
         # 绘制热力图
+
         fig, ax = plt.subplots(figsize=self.figsize, dpi=self.dpi)
         
         title = f"雷达利用率热力图 - {algorithm_name}" if algorithm_name else "雷达利用率热力图"
@@ -727,174 +1775,363 @@ class RadarPlotter:
         else:
             plt.show()
 
-    def plot_priority_satisfaction(self,
-                                 allocation_data,
-                                 time_range,
-                                 target_info,
-                                 save_path=None):
+    def plot_radar_channel_occupancy_over_time(self,
+                                           assignment_histories,
+                                           radar_info,
+                                           time_range,
+                                           save_path=None):
         """
-        绘制优先级满足度图表
+        绘制随时间变化的雷达信道占用率曲线。
         
         Args:
-            allocation_data: 分配历史数据
-            time_range: 时间范围
-            target_info: 目标信息
+            assignment_histories: 字典，键为算法名称，值为该算法的分配历史数据
+            radar_info: 字典，键为雷达ID，值为该雷达的信道数量
+            time_range: 时间范围元组 (start, end)
             save_path: 保存路径
         """
-        fig, ax = self._create_figure("目标优先级满足度")
+        fig, ax = self._create_figure("雷达信道占用率随时间变化")
         
-        # 按优先级对目标分组
-        priority_groups = {}
-        for target_id, info in target_info.items():
-            priority = info.get('priority', 1)  # 默认优先级为1
-            if priority not in priority_groups:
-                priority_groups[priority] = []
-            priority_groups[priority].append(target_id)
-            
-        # 计算每个时间步的优先级满足度
-        timestamps = []
-        satisfaction_rates = []
+        # 计算网络中总的可用信道数
+        total_channels = sum(radar_info.values())
         
-        for alloc in allocation_data:
-            timestamp = alloc['timestamp']
-            assignments = alloc['assignments']
+        # 为每个算法计算每个时间步的信道占用率
+        for algo_name, history in assignment_histories.items():
+            timestamps = []
+            occupancy_rates = []
             
-            # 统计每个优先级的分配情况
-            total_by_priority = {p: len(targets) for p, targets in priority_groups.items()}
-            assigned_by_priority = {p: 0 for p in priority_groups.keys()}
+            for entry in history:
+                timestamp = entry['timestamp']
+                assignments = entry['assignments']
+                
+                # 统计当前时间步中被占用的信道数
+                occupied_channels = 0
+                for target_id, assignment in assignments.items():
+                    if assignment['radar_id'] is not None and assignment['channel_id'] is not None:
+                        occupied_channels += 1
+                
+                # 计算占用率
+                occupancy_rate = occupied_channels / total_channels if total_channels > 0 else 0
+                
+                timestamps.append(timestamp)
+                occupancy_rates.append(occupancy_rate)
             
-            for target_id, assignment in assignments.items():
-                if assignment is not None and assignment['radar_id'] is not None:
-                    target_priority = target_info[target_id].get('priority', 1)
-                    assigned_by_priority[target_priority] += 1
-            
-            # 计算总体满足率
-            total_weighted = sum(p * total for p, total in total_by_priority.items())
-            assigned_weighted = sum(p * assigned for p, assigned in assigned_by_priority.items())
-            
-            satisfaction_rate = assigned_weighted / total_weighted if total_weighted > 0 else 0
-            
-            timestamps.append(timestamp)
-            satisfaction_rates.append(satisfaction_rate)
+            # 绘制曲线
+            ax.plot(timestamps, occupancy_rates, label=algo_name, marker='.', alpha=0.7)
         
-        # 绘制满足度曲线
-        ax.plot(timestamps, satisfaction_rates, '-o', linewidth=2, markersize=4)
         ax.set_xlim(time_range)
-        ax.set_ylim(0, 1.1)
+        ax.set_ylim(0, 1.0)
         ax.set_xlabel("时间")
-        ax.set_ylabel("优先级满足度")
-        ax.grid(True)
+        ax.set_ylabel("信道占用率")
+        ax.set_title("雷达信道占用率随时间变化")
+        ax.grid(True, linestyle='--', alpha=0.7)
+        ax.legend()
         
+        plt.tight_layout()
         if save_path:
-            plt.savefig(save_path, bbox_inches='tight', dpi=300)
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            plt.savefig(save_path, bbox_inches='tight')
+            plt.close()
+        else:
+            plt.show()
+    
+    def plot_average_radar_channel_occupancy(self,
+                                         assignment_histories,
+                                         radar_info,
+                                         save_path=None):
+        """
+        绘制各算法的平均雷达信道占用率条形图。
+        
+        Args:
+            assignment_histories: 字典，键为算法名称，值为该算法的分配历史数据
+            radar_info: 字典，键为雷达ID，值为该雷达的信道数量
+            save_path: 保存路径
+        """
+        fig, ax = self._create_figure("各算法平均雷达信道占用率")
+        
+        # 计算网络中总的可用信道数
+        total_channels = sum(radar_info.values())
+        
+        # 为每个算法计算平均信道占用率
+        algo_names = []
+        avg_occupancy_rates = []
+        
+        for algo_name, history in assignment_histories.items():
+            occupancy_rates = []
+            
+            for entry in history:
+                assignments = entry['assignments']
+                
+                # 统计当前时间步中被占用的信道数
+                occupied_channels = 0
+                for target_id, assignment in assignments.items():
+                    if assignment['radar_id'] is not None and assignment['channel_id'] is not None:
+                        occupied_channels += 1
+                
+                # 计算占用率
+                occupancy_rate = occupied_channels / total_channels if total_channels > 0 else 0
+                occupancy_rates.append(occupancy_rate)
+            
+            # 计算平均占用率
+            avg_occupancy_rate = sum(occupancy_rates) / len(occupancy_rates) if occupancy_rates else 0
+            
+            algo_names.append(algo_name)
+            avg_occupancy_rates.append(avg_occupancy_rate)
+        
+        # 绘制条形图
+        bars = ax.bar(algo_names, avg_occupancy_rates, 
+                     color=[self.radar_colors[i % len(self.radar_colors)] for i in range(len(algo_names))],
+                     alpha=0.8, edgecolor='black', linewidth=0.5)
+        
+        # 在条形上方添加数值标签
+        for bar in bars:
+            height = bar.get_height()
+            ax.text(bar.get_x() + bar.get_width()/2., height + 0.01,
+                   f'{height:.2%}', ha='center', va='bottom', fontsize=10)
+        
+        ax.set_ylim(0, max(avg_occupancy_rates) * 1.2 if avg_occupancy_rates else 1.0)
+        ax.set_ylabel("平均信道占用率")
+        ax.set_title("各算法平均雷达信道占用率")
+        ax.grid(True, axis='y', linestyle='--', alpha=0.7)
+        
+        plt.tight_layout()
+        if save_path:
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            plt.savefig(save_path, bbox_inches='tight')
             plt.close()
         else:
             plt.show()
 
-        def plot_spatiotemporal_assignment(assignment_history, radars_dict, targets_by_timestep, 
-                                    time_range, save_path=None, interval=200):
-            """创建时空分布动态可视化"""
-            from matplotlib.animation import FuncAnimation
-            
-            fig = plt.figure(figsize=(12, 10))
-            ax = fig.add_subplot(111, projection='3d')
-            
-            # 绘制雷达位置和覆盖范围（静态部分）
-            for radar_id, info in radars_dict.items():
-                ax.scatter(info['x'], info['y'], info['z'], c='r', marker='^', s=100, label=f'雷达 {radar_id}')
+    def plot_priority_satisfaction(self,
+                              allocation_histories,
+                              time_range,
+                              target_priority_info,
+                              save_path=None):
+        """
+        绘制不同算法的优先级满足度比较图
+        
+        Args:
+            allocation_histories: 不同算法的分配历史数据，格式为 {算法名称: 分配历史}
+            time_range: 时间范围
+            target_priority_info: 目标优先级信息，格式为 {目标ID: {'priority': 优先级值, 'type': 目标类型}}
+            save_path: 保存路径
+        """
+        fig, ax = self._create_figure("目标优先级满足度比较")
+        
+        # 计算每个算法的优先级满足度
+        algorithm_satisfaction = {}
+        
+        for algorithm_name, history in allocation_histories.items():
+            # 确保history是列表类型
+            if not isinstance(history, list):
+                logging.error(f"算法 {algorithm_name} 的分配历史数据不是列表类型")
+                continue
                 
-                # 绘制雷达覆盖范围（简化为半透明球体）
-                u, v = np.mgrid[0:2*np.pi:20j, 0:np.pi:10j]
-                x = info['radius'] * np.cos(u) * np.sin(v) + info['x']
-                y = info['radius'] * np.sin(u) * np.sin(v) + info['y']
-                z = info['radius'] * np.cos(v) + info['z']
-                ax.plot_wireframe(x, y, z, color='gray', alpha=0.1)
+            # 初始化优先级统计
+            priority_counts = {}  # {优先级: [分配次数, 总次数]}
             
-            # 初始化目标散点和连线
-            target_scatter = ax.scatter([], [], [], c=[], cmap='viridis', s=50, alpha=0.8)
-            assignment_lines = []
-            
-            # 设置坐标轴
-            ax.set_xlabel('X (m)')
-            ax.set_ylabel('Y (m)')
-            ax.set_zlabel('Z (m)')
-            ax.set_title('目标-雷达分配的时空分布')
-            
-            # 添加时间标签
-            time_text = ax.text2D(0.02, 0.98, '', transform=ax.transAxes)
-            
-            # 初始化函数
-            def init():
-                target_scatter._offsets3d = ([], [], [])
-                for line in assignment_lines:
-                    if line:
-                        line.set_data([], [])
-                        line.set_3d_properties([])
-                time_text.set_text('')
-                return [target_scatter, time_text] + assignment_lines
-            
-            # 更新函数
-            def update(frame):
-                # 清除之前的连线
-                for line in assignment_lines:
-                    if line:
-                        line.remove()
-                assignment_lines.clear()
-                
-                if frame >= len(assignment_history):
-                    return [target_scatter, time_text]
-                
-                timestep = assignment_history[frame]['timestamp']
-                assignments = assignment_history[frame]['assignments']
-                
-                if timestep not in targets_by_timestep:
-                    return [target_scatter, time_text]
+            # 遍历每个时间步
+            for alloc in history:
+                # 确保alloc是字典类型
+                if not isinstance(alloc, dict):
+                    logging.error(f"算法 {algorithm_name} 的分配历史中包含非字典类型数据")
+                    continue
                     
-                targets = targets_by_timestep[timestep]
-                
-                # 更新目标位置
-                x, y, z = [], [], []
-                colors = []  # 用颜色表示优先级
-                
-                for target in targets:
-                    target_id = str(target['id'])
-                    x.append(target['position'][0])
-                    y.append(target['position'][1])
-                    z.append(target['position'][2])
-                    colors.append(target['priority'])  # 颜色基于优先级
+                # 确保alloc包含必要的键
+                if 'timestamp' not in alloc or 'assignments' not in alloc:
+                    logging.error(f"算法 {algorithm_name} 的分配历史数据格式不正确，缺少必要的键")
+                    continue
                     
-                    # 如果目标被分配了雷达，绘制连线
-                    if target_id in assignments and assignments[target_id] is not None:
-                        radar_id = assignments[target_id]['radar_id']
-                        if radar_id in radars_dict:
-                            radar = radars_dict[radar_id]
-                            line = ax.plot([target['position'][0], radar['x']], 
-                                        [target['position'][1], radar['y']], 
-                                        [target['position'][2], radar['z']], 
-                                        'k-', alpha=0.3)[0]
-                            assignment_lines.append(line)
+                timestamp = alloc['timestamp']
+                assignments = alloc['assignments']
                 
-                # 更新散点图
-                target_scatter._offsets3d = (x, y, z)
-                target_scatter.set_array(np.array(colors))
+                # 遍历每个目标的分配情况
+                for target_id, assignment in assignments.items():
+                    # 获取目标优先级
+                    if target_id not in target_priority_info:
+                        continue
+                        
+                    priority = target_priority_info[target_id]['priority']
+                    
+                    if priority not in priority_counts:
+                        priority_counts[priority] = [0, 0]
+                    
+                    priority_counts[priority][1] += 1  # 总次数加1
+                    
+                    # 如果目标被分配了雷达，则分配次数加1
+                    if assignment is not None and assignment['radar_id'] is not None:
+                        priority_counts[priority][0] += 1
+            
+            # 计算每个优先级的满足率
+            satisfaction_rates = {}
+            for priority, counts in priority_counts.items():
+                if counts[1] > 0:
+                    satisfaction_rates[priority] = counts[0] / counts[1]
+                else:
+                    satisfaction_rates[priority] = 0
+            
+            algorithm_satisfaction[algorithm_name] = satisfaction_rates
+        
+        # 绘制柱状图
+        priorities = sorted(set().union(*[list(rates.keys()) for rates in algorithm_satisfaction.values()]))
+        x = np.arange(len(priorities))
+        width = 0.8 / len(algorithm_satisfaction)
+        
+        for i, (algorithm, rates) in enumerate(algorithm_satisfaction.items()):
+            values = [rates.get(p, 0) for p in priorities]
+            offset = (i - len(algorithm_satisfaction) / 2 + 0.5) * width
+            bars = ax.bar(x + offset, values, width, label=algorithm)
+            
+            # 添加数值标签
+            for bar, val in zip(bars, values):
+                height = bar.get_height()
+                ax.text(bar.get_x() + bar.get_width() / 2, height + 0.02,
+                    f'{val:.2f}', ha='center', va='bottom', fontsize=8)
+        
+        # 设置坐标轴
+        ax.set_xlabel('目标优先级')
+        ax.set_ylabel('满足率 (分配次数/总次数)')
+        ax.set_title('不同算法的优先级满足度比较')
+        ax.set_xticks(x)
+        ax.set_xticklabels([f'P{p}' for p in priorities])
+        ax.set_ylim(0, 1.1)
+        ax.legend()
+        ax.grid(True, linestyle='--', alpha=0.7)
+        
+        plt.tight_layout()
+        
+        # 保存或显示图表
+        if save_path:
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            plt.savefig(save_path, bbox_inches='tight')
+            plt.close()
+        else:
+            plt.show()
+
+    def plot_radar_channel_occupancy_over_time(self,
+                                           assignment_histories,
+                                           radar_info,
+                                           time_range,
+                                           save_path=None):
+        """
+        绘制随时间变化的雷达信道占用率曲线。
+        
+        Args:
+            assignment_histories: 字典，键为算法名称，值为该算法的分配历史数据
+            radar_info: 字典，键为雷达ID，值为该雷达的信道数量
+            time_range: 时间范围元组 (start, end)
+            save_path: 保存路径
+        """
+        fig, ax = self._create_figure("雷达信道占用率随时间变化")
+        
+        # 计算网络中总的可用信道数
+        total_channels = sum(radar_info.values())
+        
+        # 为每个算法计算每个时间步的信道占用率
+        for algo_name, history in assignment_histories.items():
+            timestamps = []
+            occupancy_rates = []
+            
+            for entry in history:
+                timestamp = entry['timestamp']
+                assignments = entry['assignments']
                 
-                # 更新时间标签
-                time_text.set_text(f'时间步: {timestep}')
+                # 统计当前时间步中被占用的信道数
+                occupied_channels = 0
+                for target_id, assignment in assignments.items():
+                    if assignment['radar_id'] is not None and assignment['channel_id'] is not None:
+                        occupied_channels += 1
                 
-                return [target_scatter, time_text] + assignment_lines
+                # 计算占用率
+                occupancy_rate = occupied_channels / total_channels if total_channels > 0 else 0
+                
+                timestamps.append(timestamp)
+                occupancy_rates.append(occupancy_rate)
             
-            # 创建动画
-            ani = FuncAnimation(fig, update, frames=range(time_range[0], time_range[1]),
-                            init_func=init, blit=False, interval=interval)
+            # 绘制曲线
+            ax.plot(timestamps, occupancy_rates, label=algo_name, marker='.', alpha=0.7)
+        
+        ax.set_xlim(time_range)
+        ax.set_ylim(0, 1.0)
+        ax.set_xlabel("时间")
+        ax.set_ylabel("信道占用率")
+        ax.set_title("雷达信道占用率随时间变化")
+        ax.grid(True, linestyle='--', alpha=0.7)
+        ax.legend()
+        
+        plt.tight_layout()
+        if save_path:
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            plt.savefig(save_path, bbox_inches='tight')
+            plt.close()
+        else:
+            plt.show()
+    
+    def plot_average_radar_channel_occupancy(self,
+                                         assignment_histories,
+                                         radar_info,
+                                         save_path=None):
+        """
+        绘制各算法的平均雷达信道占用率条形图。
+        
+        Args:
+            assignment_histories: 字典，键为算法名称，值为该算法的分配历史数据
+            radar_info: 字典，键为雷达ID，值为该雷达的信道数量
+            save_path: 保存路径
+        """
+        fig, ax = self._create_figure("各算法平均雷达信道占用率")
+        
+        # 计算网络中总的可用信道数
+        total_channels = sum(radar_info.values())
+        
+        # 为每个算法计算平均信道占用率
+        algo_names = []
+        avg_occupancy_rates = []
+        
+        for algo_name, history in assignment_histories.items():
+            occupancy_rates = []
             
-            if save_path:
-                os.makedirs(os.path.dirname(save_path), exist_ok=True)
-                ani.save(save_path, writer='ffmpeg', dpi=200)
-                plt.close()
-            else:
-                plt.show()
+            for entry in history:
+                assignments = entry['assignments']
+                
+                # 统计当前时间步中被占用的信道数
+                occupied_channels = 0
+                for target_id, assignment in assignments.items():
+                    if assignment['radar_id'] is not None and assignment['channel_id'] is not None:
+                        occupied_channels += 1
+                
+                # 计算占用率
+                occupancy_rate = occupied_channels / total_channels if total_channels > 0 else 0
+                occupancy_rates.append(occupancy_rate)
             
-            return ani
+            # 计算平均占用率
+            avg_occupancy_rate = sum(occupancy_rates) / len(occupancy_rates) if occupancy_rates else 0
+            
+            algo_names.append(algo_name)
+            avg_occupancy_rates.append(avg_occupancy_rate)
+        
+        # 绘制条形图
+        bars = ax.bar(algo_names, avg_occupancy_rates, 
+                     color=[self.radar_colors[i % len(self.radar_colors)] for i in range(len(algo_names))],
+                     alpha=0.8, edgecolor='black', linewidth=0.5)
+        
+        # 在条形上方添加数值标签
+        for bar in bars:
+            height = bar.get_height()
+            ax.text(bar.get_x() + bar.get_width()/2., height + 0.01,
+                   f'{height:.2%}', ha='center', va='bottom', fontsize=10)
+        
+        ax.set_ylim(0, max(avg_occupancy_rates) * 1.2 if avg_occupancy_rates else 1.0)
+        ax.set_ylabel("平均信道占用率")
+        ax.set_title("各算法平均雷达信道占用率")
+        ax.grid(True, axis='y', linestyle='--', alpha=0.7)
+        
+        plt.tight_layout()
+        if save_path:
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            plt.savefig(save_path, bbox_inches='tight')
+            plt.close()
+        else:
+            plt.show()
 
     def plot_overall_performance(self, assignment_histories, targets_by_timestep, radar_info, save_path=None):
         """绘制算法综合性能评分图"""
@@ -1075,6 +2312,132 @@ class RadarPlotter:
             fig.savefig(f"{save_path}_overall.png", dpi=300, bbox_inches='tight')
             fig2.savefig(f"{save_path}_breakdown.png", dpi=300, bbox_inches='tight')
             plt.close('all')
+        else:
+            plt.show()
+
+    def plot_radar_channel_occupancy_over_time(self,
+                                           assignment_histories,
+                                           radar_info,
+                                           time_range,
+                                           save_path=None):
+        """
+        绘制随时间变化的雷达信道占用率曲线。
+        
+        Args:
+            assignment_histories: 字典，键为算法名称，值为该算法的分配历史数据
+            radar_info: 字典，键为雷达ID，值为该雷达的信道数量
+            time_range: 时间范围元组 (start, end)
+            save_path: 保存路径
+        """
+        fig, ax = self._create_figure("雷达信道占用率随时间变化")
+        
+        # 计算网络中总的可用信道数
+        total_channels = sum(radar_info.values())
+        
+        # 为每个算法计算每个时间步的信道占用率
+        for algo_name, history in assignment_histories.items():
+            timestamps = []
+            occupancy_rates = []
+            
+            for entry in history:
+                timestamp = entry['timestamp']
+                assignments = entry['assignments']
+                
+                # 统计当前时间步中被占用的信道数
+                occupied_channels = 0
+                for target_id, assignment in assignments.items():
+                    if assignment['radar_id'] is not None and assignment['channel_id'] is not None:
+                        occupied_channels += 1
+                
+                # 计算占用率
+                occupancy_rate = occupied_channels / total_channels if total_channels > 0 else 0
+                
+                timestamps.append(timestamp)
+                occupancy_rates.append(occupancy_rate)
+            
+            # 绘制曲线
+            ax.plot(timestamps, occupancy_rates, label=algo_name, marker='.', alpha=0.7)
+        
+        ax.set_xlim(time_range)
+        ax.set_ylim(0, 1.0)
+        ax.set_xlabel("时间")
+        ax.set_ylabel("信道占用率")
+        ax.set_title("雷达信道占用率随时间变化")
+        ax.grid(True, linestyle='--', alpha=0.7)
+        ax.legend()
+        
+        plt.tight_layout()
+        if save_path:
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            plt.savefig(save_path, bbox_inches='tight')
+            plt.close()
+        else:
+            plt.show()
+    
+    def plot_average_radar_channel_occupancy(self,
+                                         assignment_histories,
+                                         radar_info,
+                                         save_path=None):
+        """
+        绘制各算法的平均雷达信道占用率条形图。
+        
+        Args:
+            assignment_histories: 字典，键为算法名称，值为该算法的分配历史数据
+            radar_info: 字典，键为雷达ID，值为该雷达的信道数量
+            save_path: 保存路径
+        """
+        fig, ax = self._create_figure("各算法平均雷达信道占用率")
+        
+        # 计算网络中总的可用信道数
+        total_channels = sum(radar_info.values())
+        
+        # 为每个算法计算平均信道占用率
+        algo_names = []
+        avg_occupancy_rates = []
+        
+        for algo_name, history in assignment_histories.items():
+            occupancy_rates = []
+            
+            for entry in history:
+                assignments = entry['assignments']
+                
+                # 统计当前时间步中被占用的信道数
+                occupied_channels = 0
+                for target_id, assignment in assignments.items():
+                    if assignment['radar_id'] is not None and assignment['channel_id'] is not None:
+                        occupied_channels += 1
+                
+                # 计算占用率
+                occupancy_rate = occupied_channels / total_channels if total_channels > 0 else 0
+                occupancy_rates.append(occupancy_rate)
+            
+            # 计算平均占用率
+            avg_occupancy_rate = sum(occupancy_rates) / len(occupancy_rates) if occupancy_rates else 0
+            
+            algo_names.append(algo_name)
+            avg_occupancy_rates.append(avg_occupancy_rate)
+        
+        # 绘制条形图
+        bars = ax.bar(algo_names, avg_occupancy_rates, 
+                     color=[self.radar_colors[i % len(self.radar_colors)] for i in range(len(algo_names))],
+                     alpha=0.8, edgecolor='black', linewidth=0.5)
+        
+        # 在条形上方添加数值标签
+        for bar in bars:
+            height = bar.get_height()
+            ax.text(bar.get_x() + bar.get_width()/2., height + 0.01,
+                   f'{height:.2%}', ha='center', va='bottom', fontsize=10)
+        
+        ax.set_ylim(0, max(avg_occupancy_rates) * 1.2 if avg_occupancy_rates else 1.0)
+        ax.set_ylabel("平均信道占用率")
+        ax.set_title("各算法平均雷达信道占用率")
+        ax.grid(True, axis='y', linestyle='--', alpha=0.7)
+        
+        plt.tight_layout()
+        if save_path:
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            plt.savefig(save_path, bbox_inches='tight')
+            plt.close()
         else:
             plt.show()
 
