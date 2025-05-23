@@ -250,17 +250,4 @@ for algo_name, data in switching_data.items():
         save_path=os.path.join(output_dir, f"{algo_name.lower().replace('-', '_')}_target_switching.png")
     )
 
-# 6. 收敛曲线
-plotter.plot_convergence_curve(
-    convergence_data,
-    save_path=os.path.join(output_dir, "convergence_curve.png")
-)
-
-# 7. 性能箱线图
-plotter.plot_boxplot(
-    performance_data,
-    metric_name="Tracking coverage",
-    save_path=os.path.join(output_dir, "performance_boxplot.png")
-)
-
 print(f"所有图表已保存到 {output_dir}")
