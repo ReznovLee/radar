@@ -12,8 +12,8 @@ import numpy as np
 from scipy.sparse import csr_matrix
 from typing import List, Dict, Tuple, Set
 import random
-from src.core.models.radar_model import RadarNetwork
-from src.core.utils.constraints import ConstraintChecker
+from core.models.radar_model import RadarNetwork
+from core.utils.constraints import ConstraintChecker
 
 
 class LNS:

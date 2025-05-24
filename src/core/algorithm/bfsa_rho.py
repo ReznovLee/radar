@@ -11,9 +11,9 @@
 import numpy as np
 from scipy import sparse
 from typing import List, Dict
-from src.core.models.radar_model import RadarNetwork
-from src.core.utils.filter import BallisticMissileEKF, CruiseMissileEKF, AircraftIMMEKF
-from src.core.utils.constraints import ConstraintChecker
+from core.models.radar_model import RadarNetwork
+from core.utils.filter import BallisticMissileEKF, CruiseMissileEKF, AircraftIMMEKF
+from core.utils.constraints import ConstraintChecker
 import logging
 
 
@@ -170,7 +170,7 @@ class BFSARHO:
         assignment = self._resolve_constraint_conflicts(assignment, target_positions)
         
         if assignment.getnnz() < num_targets:
-            logging.warning(f"初始分配不满足约束，{num_targets - assignment.getnnz()}个目标未分配。")
+            logging.warning(f"BFSA-RHO: The initial assignment does not satisfy the constraints, {num_targets - assignment.getnnz()} targets are unassigned.")
             
         return assignment.tocsr()
 

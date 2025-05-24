@@ -32,7 +32,7 @@ speed:
 
 # 仿真时间参数
 simulation:
-  total_time: 1000   # 总仿真时间（秒）
+  total_time: 500   # 总仿真时间（秒）
   time_step: 10    # 每个时间步长（秒）
   algorithm_step: 20.0  # 每次态势融合时间（秒）
 

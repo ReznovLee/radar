@@ -21,7 +21,7 @@ from core.models.radar_model import Radar, RadarNetwork
 from core.algorithm.bfsa_rho import BFSARHO
 from core.algorithm.rule_based import RuleBasedScheduler
 from core.algorithm.LNS import LNS
-from src.visualization.plotter import RadarPlotter
+from visualization.plotter import RadarPlotter
 
 
 def load_yaml_config(config_path):
@@ -572,9 +572,9 @@ def main():
         config_path = os.path.join("data\\config\\param_config.yaml")  # windows
     else:
         config_path = os.path.join('data', 'config', 'param_config.yaml')  # linux
-    radar_csv_path = os.path.join('..', 'output', 'scenario-2025-05-23', '5-radar.csv')
-    target_csv_path = os.path.join('..', 'output', 'scenario-2025-05-23', '50-targets.csv')
-    outputs_dir = os.path.join('..', 'output', 'scenario-2025-05-23')
+    radar_csv_path = os.path.join('..', 'output', 'scenario-2025-05-24', '5-radar.csv')
+    target_csv_path = os.path.join('..', 'output', 'scenario-2025-05-24', '50-targets.csv')
+    outputs_dir = os.path.join('..', 'output', 'scenario-2025-05-24')
     os.makedirs(outputs_dir, exist_ok=True)
 
     config = load_yaml_config(config_path)

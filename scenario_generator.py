@@ -166,7 +166,7 @@ def generate_random_targets(center_drop_position_str, target_dispersion_rate, ti
     aircraft_speed = config["speed"]["aircraft_speed"]
 
     # Sample param date
-    TOTAL_SAMPLE = 1000
+    TOTAL_SAMPLE = 500
     dt = TOTAL_SAMPLE / time_to_impact
 
     # Load scenario config
@@ -612,7 +612,7 @@ def generate_scenario():
     save_radars_2_csv(radars, output_folder_path, radar_file_name)
 
     # 生成并保存目标数据
-    targets = generate_random_targets(target_drop_position, target_aggregation_rate, time_to_impact=1000)
+    targets = generate_random_targets(target_drop_position, target_aggregation_rate, time_to_impact=500)
     target_file_name = config["output"]["target_filename_template"].format(num_targets=num_targets)
     save_targets_2_csv(targets, output_folder_path, target_file_name)
 
