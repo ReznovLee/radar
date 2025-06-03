@@ -10,7 +10,7 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from core.utils.filter import BallisticMissileEKF, CruiseMissileEKF, AircraftIMMEKF, Filter
+from src.core.utils.filter import BallisticMissileEKF, CruiseMissileEKF, AircraftIMMEKF, Filter
 
 
 class FilterTester:
