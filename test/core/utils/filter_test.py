@@ -10,7 +10,7 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from src.core.utils.filter import BallisticMissileEKF, CruiseMissileEKF, AircraftIMMEKF, Filter
+from core.utils.filter import BallisticMissileEKF, CruiseMissileEKF, AircraftIMMEKF, Filter
 
 
 class FilterTester:
@@ -314,8 +314,8 @@ def main():
     SKIP_POINTS_FOR_RMSE_PLOT = 10 
 
     # 初始化测试器
-    tester = FilterTester("output/scenario-2025-04-28/10-targets.csv")
-    
+    tester = FilterTester("output/scenario-2025-05-21/50-targets.csv")
+
     # --- 测试弹道导弹 ---
     true_pos_bm, est_pos_bm = tester.test_ballistic_missile(1)
     # 计算跳过初始点的 RMSE
@@ -345,7 +345,7 @@ def main():
 
 if __name__ == "__main__":
     main()
-    test_param = Filter("output/scenario-2025-04-28/10-targets.csv")
+    test_param = Filter("output/scenario-2025-05-21/50-targets.csv")
     true_BM, perdit_BM = test_param.test_ballistic_missile(1)
     true_CM, perdit_CM = test_param.test_cruise_missile(2)
     true_AC, perdit_AC = test_param.test_aircraft(7)

@@ -4,7 +4,7 @@
 num_radars: 5
 
 # 目标数量
-num_targets: 50
+num_targets: 500
 
 # 雷达聚集率
 radar_aggregation_rate: 0.6
